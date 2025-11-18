@@ -1,0 +1,890 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  MessageSquare, 
+  Trophy, 
+  Moon, 
+  Sun, 
+  Send, 
+  User, 
+  Shield, 
+  CheckCircle, 
+  Clock, 
+  ChevronDown, 
+  ChevronUp,
+  Plus,
+  Trash2,
+  Users,
+  BookOpen,
+  LogIn,
+  Mail,
+  Lock,
+  UserPlus
+} from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  onAuthStateChanged,
+  updateProfile, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  query, 
+  onSnapshot, 
+  serverTimestamp,
+  doc,
+  deleteDoc,
+  updateDoc
+} from 'firebase/firestore';
+
+// Load Tailwind CSS script for styling
+
+// --- New Firebase Setup (Using your provided config) ---
+const NEW_FIREBASE_CONFIG = {
+  // UPDATED API KEY: AIzaSyDl-ntwuz9qn2tXDwwNCxvfqEKos3rte6Y
+  apiKey: "AIzaSyDl-ntwuz9qn2tXDwwNCxvfqEKos3rte6Y",
+  authDomain: "os-daily-practice-data.firebaseapp.com",
+  projectId: "os-daily-practice-data",
+  storageBucket: "os-daily-practice-data.firebasestorage.app",
+  messagingSenderId: "854911444720",
+  appId: "1:854911444720:web:1406bd3843a3082a3fc435",
+  measurementId: "G-47TJTYBX20"
+};
+
+const app = initializeApp(NEW_FIREBASE_CONFIG);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// --- Custom Tempo Colors ---
+// Primary Accent (Red/Orange) for SMS and highlights: #ef6d4f
+const COLOR_SMS = '#ef6d4f'; 
+// Secondary Accent (Deep Blue/Purple) for Quiz: #485484
+const COLOR_QUIZ = '#485484';
+
+// --- Constants & Utils ---
+// IMPORTANT: To ensure compatibility with GitHub Pages, we use a reliable, external image URL.
+const LOGO_URL = "https://play-lh.googleusercontent.com/ZvXwylZYLMWrhTbpMKpehJWBhg9VcHoiovOHh4oRA3dU_e9tQp0gYRzkRp29QkAxhI4=w240-h480-rw";
+
+const MODES = {
+  SMS: { 
+    id: 'sms', 
+    label: 'Daily SMS', 
+    icon: MessageSquare, 
+    color: `text-[${COLOR_SMS}]`, 
+    bg: `bg-[${COLOR_SMS}]`,     
+    persona: 'Coach Melissa',
+    desc: 'Respond to member inquiries via text.'
+  },
+  QUIZ: { 
+    id: 'quiz', 
+    label: 'Weekly Quiz', 
+    icon: Trophy, 
+    color: `text-[${COLOR_QUIZ}]`, 
+    bg: `bg-[${COLOR_QUIZ}]`,     
+    persona: 'Sales Expert',
+    desc: 'Test your knowledge on retention and sales.'
+  }
+};
+
+const formatDate = (timestamp) => {
+  if (!timestamp || !timestamp.seconds) return '';
+  return new Date(timestamp.seconds * 1000).toLocaleDateString() + ' ' + 
+         new Date(timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+// --- Components (No changes needed in component structure, only in data handling functions) ---
+
+const Header = ({ theme, toggleTheme, userRole, currentUser }) => (
+  <header className="sticky top-0 z-50 w-full backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 transition-colors duration-300">
+    <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        {/* Logo using reliable external URL */}
+        <img 
+          src={LOGO_URL} 
+          alt="Tempo Logo" 
+          className="w-8 h-8 rounded-lg object-cover shadow-lg shadow-[#ef6d4f]/20"
+          onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/32x32/ef6d4f/ffffff?text=T"; }} 
+        />
+        <span className="font-bold text-xl tracking-tight text-zinc-900 dark:text-white">
+          TEMPO<span className="text-[#ef6d4f]">PRACTICE</span>
+        </span>
+      </div>
+
+      <div className="flex items-center gap-3">
+        {/* Display Current Role */}
+        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-full 
+            bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+            {userRole === 'admin' ? <Shield size={14} /> : <User size={14} />}
+            {userRole === 'admin' ? 'Manager View' : 'Agent View'}
+        </div>
+        
+        <button 
+          onClick={toggleTheme}
+          className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors"
+        >
+          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
+        
+        {currentUser && (
+          <div className="flex items-center gap-2 pl-2 border-l border-zinc-200 dark:border-zinc-700 ml-2">
+            <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-600 dark:text-zinc-400"
+                 title={currentUser.displayName || 'Agent'}>
+              {currentUser.displayName?.charAt(0).toUpperCase() || 'A'}
+            </div>
+            <span className="text-sm font-medium hidden sm:block">
+              {currentUser.displayName || 'Agent'}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  </header>
+);
+
+const LoginScreen = ({ onSignIn, onSignUp, onAdminBypass }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState(''); // Agent Name/ID for sign up only
+  const [isSigningUp, setIsSigningUp] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      if (isSigningUp) {
+        await onSignUp(email, password, name);
+      } else {
+        await onSignIn(email, password);
+      }
+    } catch (err) {
+      // Firebase errors are handled in the main component and re-thrown as user-friendly strings
+      setError(err.message); 
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4 transition-colors duration-300">
+      <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-xl p-8 border border-zinc-200 dark:border-zinc-800">
+        <div className="flex justify-center mb-6">
+          {/* Logo using reliable external URL (Large) */}
+          <img 
+            src={LOGO_URL} 
+            alt="Tempo Logo" 
+            className="w-16 h-16 rounded-2xl object-cover shadow-xl shadow-[#ef6d4f]/30"
+            onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/64x64/ef6d4f/ffffff?text=LOGO"; }} 
+          />
+        </div>
+        <h2 className="text-2xl font-bold text-center text-zinc-900 dark:text-white mb-2">
+          {isSigningUp ? 'Create Agent Account' : 'Agent Sign In'}
+        </h2>
+        <p className="text-center text-zinc-500 dark:text-zinc-400 mb-8">
+          {isSigningUp ? 'Use your work email and choose a secure password.' : 'Sign in to access your daily training.'}
+        </p>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          
+          {isSigningUp && (
+            <div className="relative">
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Agent Name/ID (e.g., AG101)</label>
+              <User size={18} className="absolute left-3 top-10 text-zinc-400 dark:text-zinc-500" />
+              <input 
+                type="text" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 focus:ring-[#ef6d4f] focus:border-transparent outline-none transition-all"
+                placeholder="Agent Name or ID"
+                required={isSigningUp}
+              />
+            </div>
+          )}
+
+          <div className="relative">
+            <Mail size={18} className="absolute left-3 top-3.5 text-zinc-400 dark:text-zinc-500" />
+            <input 
+              type="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 focus:ring-[#ef6d4f] focus:border-transparent outline-none transition-all"
+              placeholder="Email"
+              required
+            />
+          </div>
+
+          <div className="relative">
+            <Lock size={18} className="absolute left-3 top-3.5 text-zinc-400 dark:text-zinc-500" />
+            <input 
+              type="password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 focus:ring-[#ef6d4f] focus:border-transparent outline-none transition-all"
+              placeholder="Password (min 6 characters)"
+              required
+            />
+          </div>
+
+          {error && (
+            <div className="p-3 text-sm font-medium text-white bg-[#f46d6d] rounded-lg">
+              {error}
+            </div>
+          )}
+
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full py-3 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? 'Processing...' : (
+              <>
+                {isSigningUp ? <UserPlus size={18} /> : <LogIn size={18} />}
+                {isSigningUp ? 'Create Account' : 'Sign In'}
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+            <button 
+                type="button"
+                onClick={() => setIsSigningUp(prev => !prev)}
+                className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-[#ef6d4f] transition-colors"
+            >
+                {isSigningUp ? 'Already have an account? Sign In' : "New agent? Create an account"}
+            </button>
+        </div>
+
+
+      </div>
+
+      {/* Hidden Admin Bypass for Managers */}
+      <button 
+        onClick={onAdminBypass}
+        className="mt-6 text-xs text-zinc-400 dark:text-zinc-600 hover:text-[#ef6d4f] transition-colors flex items-center gap-1 opacity-70 hover:opacity-100"
+      >
+        <Shield size={12} /> Manager/Admin Bypass
+      </button>
+    </div>
+  );
+};
+
+// --- Admin Components ---
+
+const CreatePrompt = ({ activeTab, onCreate }) => {
+  const [content, setContent] = useState('');
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!content.trim()) return;
+    onCreate(content);
+    setContent('');
+  };
+
+  const mode = activeTab === 'sms' ? MODES.SMS : MODES.QUIZ;
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 mb-6 shadow-sm">
+      <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+        <Plus size={20} className="text-[#ef6d4f]" /> 
+        Create New {mode.label}
+      </h3>
+      <form onSubmit={handleSubmit}>
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          className="w-full p-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 focus:ring-[#ef6d4f] outline-none min-h-[120px] resize-none mb-4"
+          placeholder={mode.id === 'sms' ? "Example: 'Hey Tempo, my screen is frozen during a workout. Help!'" : "Example: 'What are the three key pillars of our retention strategy?'"}
+        />
+        <div className="flex justify-end">
+          <button 
+            type="submit"
+            disabled={!content.trim()}
+            className={`px-6 py-2 rounded-lg font-medium text-white ${mode.bg} hover:opacity-90 transition-opacity disabled:opacity-50`}
+          >
+            Post Challenge
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+// Component for Admin Feedback Input
+const FeedbackInput = ({ response, onPostFeedback }) => {
+    const [feedback, setFeedback] = useState(response.adminFeedback || '');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const hasFeedback = !!response.adminFeedback;
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!feedback.trim()) return;
+        setIsSubmitting(true);
+        await onPostFeedback(response.id, feedback);
+        setIsSubmitting(false);
+    };
+
+    // Determine the button color based on whether feedback exists
+    const buttonBgClass = hasFeedback ? `bg-[${COLOR_QUIZ}]` : `bg-[${COLOR_SMS}]`;
+
+    return (
+        <form onSubmit={handleSubmit} className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+            <label className="block text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400 mb-1">Admin Feedback</label>
+            <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                className="w-full p-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-1 focus:ring-[#ef6d4f] outline-none text-sm resize-none"
+                placeholder="Enter coaching points or correction details..."
+                rows={3}
+            />
+            <div className="flex justify-end mt-2">
+                <button
+                    type="submit"
+                    disabled={!feedback.trim() || isSubmitting}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium text-white ${buttonBgClass} hover:opacity-90 transition-colors disabled:opacity-50`}
+                >
+                    {isSubmitting ? 'Saving...' : hasFeedback ? 'Update Feedback' : 'Post Feedback'}
+                </button>
+            </div>
+        </form>
+    );
+};
+
+
+// Updated AdminResponseView to include the FeedbackInput
+const AdminResponseView = ({ responses, promptId, onPostFeedback }) => {
+  const relevantResponses = responses.filter(r => r.promptId === promptId);
+  
+  if (relevantResponses.length === 0) {
+    return <div className="p-4 text-sm text-zinc-500 italic">No responses yet.</div>;
+  }
+
+  return (
+    <div className="mt-4 space-y-4">
+      {relevantResponses.map(response => (
+        <div key={response.id} className="bg-white dark:bg-zinc-900/50 rounded-xl p-4 border border-zinc-200 dark:border-zinc-800">
+          <div className="flex justify-between items-start mb-2">
+            <span className="font-medium text-zinc-900 dark:text-white flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs">
+                {response.userName?.charAt(0)}
+              </div>
+              {response.userName}
+            </span>
+            <span className="text-xs text-zinc-400">{formatDate(response.timestamp)}</span>
+          </div>
+          <p className="text-zinc-700 dark:text-zinc-300 text-sm whitespace-pre-wrap">{response.responseContent}</p>
+
+          {/* New Feedback Input */}
+          <FeedbackInput response={response} onPostFeedback={onPostFeedback} />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// --- Agent Components ---
+
+// Component for Agent's submitted history, showing feedback
+const AgentResponseHistoryCard = ({ response, allPrompts }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const hasFeedback = !!response.adminFeedback;
+
+    const prompt = allPrompts.find(p => p.id === response.promptId);
+    if (!prompt) return null; // Should not happen
+
+    const mode = prompt.type === 'sms' ? MODES.SMS : MODES.QUIZ;
+
+    const toggleExpand = () => setIsExpanded(prev => !prev);
+
+    return (
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide text-white ${mode.bg}`}>
+                    {mode.id === 'sms' ? <MessageSquare size={12} /> : <Trophy size={12} />}
+                    {mode.label}
+                </div>
+                {hasFeedback && (
+                    <div className="text-xs font-semibold text-green-500 flex items-center gap-1">
+                        <CheckCircle size={14} /> Feedback Received
+                    </div>
+                )}
+            </div>
+
+            {/* Prompt Inquiry */}
+            <div className="mb-4 p-4 bg-zinc-50 dark:bg-zinc-950 rounded-lg border-l-4 border-zinc-300 dark:border-zinc-700">
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1 uppercase tracking-wider font-bold text-[10px]">Original Inquiry</p>
+                <p className="text-zinc-800 dark:text-zinc-200 italic">"{prompt.content}"</p>
+            </div>
+
+            {/* Response Summary/Toggle */}
+            <div className="cursor-pointer" onClick={toggleExpand}>
+                <div className="flex justify-between items-center">
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold text-[10px] flex items-center gap-2">
+                        Your Submitted Response <span className="text-xs font-normal text-zinc-400">({formatDate(response.timestamp)})</span>
+                    </p>
+                    {isExpanded ? <ChevronUp size={16} className="text-zinc-400" /> : <ChevronDown size={16} className="text-zinc-400" />}
+                </div>
+                {/* Show truncated preview when collapsed */}
+                {!isExpanded && (
+                    <p className="text-zinc-700 dark:text-zinc-300 mt-2 line-clamp-2 overflow-hidden">
+                        {response.responseContent}
+                    </p>
+                )}
+            </div>
+
+            {/* Expanded Content: Full Response + Feedback */}
+            {isExpanded && (
+                <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-4">
+                    {/* Full Response */}
+                    <div>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1 uppercase tracking-wider font-bold text-[10px]">Full Response</p>
+                        <p className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">{response.responseContent}</p>
+                    </div>
+
+                    {/* Feedback */}
+                    <div className={`p-4 rounded-xl ${hasFeedback ? 'bg-zinc-100 dark:bg-zinc-800 border-l-4 border-[#ef6d4f]' : 'bg-zinc-50 dark:bg-zinc-950 text-zinc-500 italic'}`}>
+                        <p className="text-sm font-bold mb-1 flex items-center gap-2">
+                            {hasFeedback ? (
+                                <><Shield size={14} className="text-[#ef6d4f]" /> Admin Feedback ({formatDate(response.feedbackTimestamp)})</>
+                            ) : (
+                                <><BookOpen size={14} /> Awaiting Feedback</>
+                            )}
+                        </p>
+                        <p className={`${hasFeedback ? 'text-zinc-800 dark:text-zinc-200' : ''} whitespace-pre-wrap`}>
+                            {hasFeedback ? response.adminFeedback : "Your response is currently under review by a manager."}
+                        </p>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Response Card is now only for NEW submissions
+const ResponseCard = ({ prompt, mode, onSubmit }) => {
+  const [response, setResponse] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!response.trim()) return;
+    setIsSubmitting(true);
+    await onSubmit(prompt.id, response);
+    setIsSubmitting(false);
+    setResponse('');
+  };
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-lg shadow-zinc-200/50 dark:shadow-none transition-all hover:border-[#ef6d4f]/30 dark:hover:border-[#ef6d4f]/30">
+      <div className="flex justify-between items-start mb-4">
+        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide text-white ${mode.bg}`}>
+          {mode.id === 'sms' ? <MessageSquare size={12} /> : <Trophy size={12} />}
+          {mode.label}
+        </div>
+        <span className="text-xs text-zinc-400 flex items-center gap-1">
+          <Clock size={12} />
+          {formatDate(prompt.createdAt)}
+        </span>
+      </div>
+      
+      <h3 className="text-lg md:text-xl font-medium text-zinc-900 dark:text-white mb-6 leading-relaxed">
+        "{prompt.content}"
+      </h3>
+
+      <div className="mb-4 flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-3 py-2 rounded-lg w-fit">
+        <User size={14} />
+        Acting as: <span className={`${mode.color} font-bold`}>{mode.persona}</span>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <textarea
+          value={response}
+          onChange={(e) => setResponse(e.target.value)}
+          className="w-full p-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 focus:ring-[#ef6d4f] outline-none min-h-[100px] resize-none mb-4 placeholder:text-zinc-400"
+          placeholder={mode.id === 'sms' ? "Type your reply here..." : "Enter your answer..."}
+        />
+        <div className="flex justify-end">
+          <button 
+            type="submit"
+            disabled={!response.trim() || isSubmitting}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-white ${mode.bg} hover:brightness-110 transition-all disabled:opacity-50 shadow-md shadow-[#ef6d4f]/20`}
+          >
+            {isSubmitting ? 'Sending...' : (
+              <>
+                Submit Response <Send size={16} />
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+// --- Main App ---
+
+export default function App() {
+  const [theme, setTheme] = useState('dark');
+  const [user, setUser] = useState(null);
+  // 'agent' is default. 
+  const [userRole, setUserRole] = useState('agent'); 
+  const [activeTab, setActiveTab] = useState('sms');
+  const [prompts, setPrompts] = useState([]);
+  const [responses, setResponses] = useState([]);
+  const [expandedPromptId, setExpandedPromptId] = useState(null);
+
+  // Toggle Theme
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  
+  // Custom setter for Admin Bypass
+  const handleAdminBypass = async () => {
+    // Manager bypass now uses anonymous sign-in as a fallback/temp auth method
+    if (!user) {
+        try {
+            await signInAnonymously(auth);
+        } catch (error) {
+            console.error("Admin bypass sign-in failed", error);
+            return;
+        }
+    }
+    // Set the role to admin (this is internal for the manager's UI)
+    setUserRole('admin');
+  };
+
+  // Firebase Auth Listener
+  useEffect(() => {
+    // Only listen for auth state changes; sign-in/sign-up is handled by LoginScreen
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      // If a user with a displayName is loaded, ensure they are in the agent role by default.
+      if (currentUser && currentUser.displayName) {
+          setUserRole('agent');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Data Fetching
+  useEffect(() => {
+    if (!user) return;
+
+    // --- UPDATED: Using simple collection paths in your custom project ---
+
+    // Fetch Prompts
+    const qPrompts = query(
+      collection(db, 'prompts')
+    );
+    
+    const unsubPrompts = onSnapshot(qPrompts, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort manually (newest first)
+      data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setPrompts(data);
+    }, (err) => console.error("Prompts error:", err));
+
+    // Fetch Responses
+    const qResponses = query(
+      collection(db, 'responses')
+    );
+
+    const unsubResponses = onSnapshot(qResponses, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setResponses(data);
+    }, (err) => console.error("Responses error:", err));
+
+    return () => {
+      unsubPrompts();
+      unsubResponses();
+    };
+  }, [user]);
+
+  // --- AUTH HANDLERS ---
+  const handleSignIn = async (email, password) => {
+    try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        // The user's displayName (name/ID) is already attached from their sign-up
+        setUser(userCredential.user); 
+        setUserRole('agent');
+    } catch (error) {
+        console.error("Sign-In failed", error);
+        if (error.code === 'auth/invalid-email' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+             throw new Error("Invalid email or password. Please try again.");
+        }
+        throw new Error("Login failed. Please check your credentials.");
+    }
+  };
+
+  const handleSignUp = async (email, password, name) => {
+    if (!name.trim()) {
+         throw new Error("Agent Name/ID is required for registration.");
+    }
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        
+        // CRUCIAL: Store the Agent's name/ID as the displayName for tracking
+        await updateProfile(userCredential.user, { displayName: name });
+        
+        // Update local state and set role
+        setUser({ ...userCredential.user, displayName: name }); 
+        setUserRole('agent');
+    } catch (error) {
+        console.error("Sign-Up failed", error);
+        if (error.code === 'auth/email-already-in-use') {
+            throw new Error("This email is already registered. Please sign in instead.");
+        }
+         if (error.code === 'auth/weak-password') {
+            throw new Error("Password is too weak. Must be at least 6 characters.");
+        }
+        throw new Error("Account creation failed. Please check your inputs.");
+    }
+  };
+  // --- END AUTH HANDLERS ---
+
+  // --- FIREBASE WRITE/UPDATE HANDLERS (UPDATED COLLECTIONS) ---
+  const handleCreatePrompt = async (content) => {
+    try {
+      await addDoc(collection(db, 'prompts'), {
+        type: activeTab,
+        content,
+        createdAt: serverTimestamp(),
+        createdBy: user.uid 
+      });
+    } catch (error) {
+      console.error("Error creating prompt", error);
+    }
+  };
+
+  const handleDeletePrompt = async (id) => {
+     try {
+      await deleteDoc(doc(db, 'prompts', id));
+    } catch (error) {
+      console.error("Error deleting prompt", error);
+    }
+  };
+
+  const handleSubmitResponse = async (promptId, content) => {
+    try {
+      await addDoc(collection(db, 'responses'), {
+        promptId,
+        userId: user.uid,
+        // Use the authenticated user's displayName (Agent ID/Name)
+        userName: user.displayName || 'Agent', 
+        responseContent: content,
+        timestamp: serverTimestamp(),
+        // Initialize feedback fields
+        adminFeedback: null,
+        feedbackTimestamp: null,
+      });
+    } catch (error) {
+      console.error("Error submitting response", error);
+    }
+  };
+
+  const handlePostFeedback = async (responseId, feedback) => {
+    try {
+      const responseRef = doc(db, 'responses', responseId);
+      await updateDoc(responseRef, {
+        adminFeedback: feedback,
+        feedbackTimestamp: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Error posting feedback", error);
+    }
+  };
+
+  // Filter Logic (Relies on local state which is fine)
+  const filteredPrompts = prompts.filter(p => p.type === activeTab);
+  
+  // Find which prompts the current user has already responded to in the active tab
+  const userResponsePromptIds = responses
+    .filter(r => r.userId === user?.uid)
+    .map(r => r.promptId);
+
+  // Prompts awaiting response
+  const activeChallenges = filteredPrompts.filter(p => !userResponsePromptIds.includes(p.id));
+
+  // User's submitted responses for the active tab (filtered by current user)
+  const submittedResponses = responses
+    .filter(r => r.userId === user?.uid && filteredPrompts.map(p => p.id).includes(r.promptId))
+    .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+
+
+  // Authentication Check: Show login screen if user is not authenticated.
+  // We check for user.email as email/password users must have an email.
+  if (!user || (!user.email && userRole === 'agent')) {
+    return <LoginScreen onSignIn={handleSignIn} onSignUp={handleSignUp} onAdminBypass={handleAdminBypass} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white font-sans transition-colors duration-300 selection:bg-[#ef6d4f] selection:text-white">
+      <Header 
+        theme={theme} 
+        toggleTheme={toggleTheme} 
+        userRole={userRole} 
+        currentUser={user}
+      />
+
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        
+        {/* Tabs */}
+        <div className="flex space-x-1 bg-zinc-200 dark:bg-zinc-900 p-1 rounded-xl mb-8 w-full max-w-md mx-auto">
+          {[MODES.SMS, MODES.QUIZ].map((mode) => (
+            <button
+              key={mode.id}
+              onClick={() => setActiveTab(mode.id)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${
+                activeTab === mode.id 
+                  ? 'bg-white dark:bg-zinc-800 shadow-sm text-zinc-900 dark:text-white' 
+                  : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+              }`}
+            >
+              <mode.icon size={16} className={activeTab === mode.id ? mode.color : ''} />
+              {mode.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content Area */}
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="text-center mb-8">
+            <h2 className={`text-3xl font-bold tracking-tight mb-2 ${activeTab === 'sms' ? MODES.SMS.color : MODES.QUIZ.color}`}>
+              {activeTab === 'sms' ? 'Daily SMS Practice' : 'Weekly Knowledge Check'}
+            </h2>
+            <p className="text-zinc-500 dark:text-zinc-400 max-w-lg mx-auto">
+              {activeTab === 'sms' 
+                ? 'Sharpen your communication skills. Respond to member inquiries effectively as Coach Melissa.' 
+                : 'Test your retention strategies and product knowledge to stay sharp.'}
+            </p>
+          </div>
+
+          {userRole === 'admin' ? (
+            // --- Admin View ---
+            <div className="space-y-6">
+              <CreatePrompt activeTab={activeTab} onCreate={handleCreatePrompt} />
+              
+              <div className="space-y-4">
+                <h3 className="font-semibold text-zinc-500 dark:text-zinc-500 uppercase tracking-wider text-xs px-2">Active {activeTab} Prompts ({filteredPrompts.length})</h3>
+                {filteredPrompts.length === 0 && (
+                  <div className="text-center py-12 bg-zinc-100 dark:bg-zinc-900/50 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-800">
+                    <p className="text-zinc-500">No prompts active. Create one above!</p>
+                  </div>
+                )}
+                {filteredPrompts.map(prompt => {
+                  const responseCount = responses.filter(r => r.promptId === prompt.id).length;
+                  const isExpanded = expandedPromptId === prompt.id;
+
+                  return (
+                    <div key={prompt.id} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
+                      <div 
+                        className="p-5 cursor-pointer"
+                        onClick={() => setExpandedPromptId(isExpanded ? null : prompt.id)}
+                      >
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="flex-1">
+                            <p className="font-medium text-lg text-zinc-800 dark:text-zinc-200">{prompt.content}</p>
+                            <div className="flex items-center gap-4 mt-2">
+                              <span className="text-xs text-zinc-400">{formatDate(prompt.createdAt)}</span>
+                              <div className="flex items-center gap-1 text-xs text-zinc-500">
+                                <Users size={14} />
+                                {responseCount} response{responseCount !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                             <button 
+                              onClick={(e) => { e.stopPropagation(); handleDeletePrompt(prompt.id); }}
+                              className="text-zinc-400 hover:text-[#ef6d4f] transition-colors p-1"
+                              title="Delete Prompt"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                            {isExpanded ? <ChevronUp size={20} className="text-zinc-400" /> : <ChevronDown size={20} className="text-zinc-400" />}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {isExpanded && (
+                        <div className="border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/30 p-5">
+                          <h4 className="text-xs font-bold uppercase text-zinc-400 mb-3">Agent Responses & Feedback</h4>
+                          <AdminResponseView 
+                            responses={responses} 
+                            promptId={prompt.id} 
+                            onPostFeedback={handlePostFeedback} 
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            // --- Agent View ---
+            <div className="space-y-10">
+              
+              {/* --- 1. Active Challenges --- */}
+              <div className="space-y-4">
+                  <h3 className="font-semibold text-zinc-500 dark:text-zinc-500 uppercase tracking-wider text-xs px-2">
+                      Active Challenges ({activeChallenges.length})
+                  </h3>
+                  {activeChallenges.length === 0 ? (
+                      <div className="text-center py-12 bg-white dark:bg-zinc-900 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-800">
+                          <p className="text-zinc-500">You've answered all {MODES[activeTab.toUpperCase()].label} challenges!</p>
+                      </div>
+                  ) : (
+                      <div className="space-y-6">
+                        {activeChallenges.map(prompt => (
+                          <ResponseCard 
+                            key={prompt.id}
+                            prompt={prompt}
+                            mode={activeTab === 'sms' ? MODES.SMS : MODES.QUIZ}
+                            onSubmit={handleSubmitResponse}
+                          />
+                        ))}
+                      </div>
+                  )}
+              </div>
+
+              {/* --- 2. My Submitted Responses (History) --- */}
+              <div className="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                  <h3 className="font-semibold text-zinc-500 dark:text-zinc-500 uppercase tracking-wider text-xs px-2">
+                      My Submitted Responses ({submittedResponses.length})
+                  </h3>
+                  {submittedResponses.length === 0 ? (
+                      <div className="text-center py-12 bg-zinc-100 dark:bg-zinc-900/50 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-800">
+                          <p className="text-zinc-500">Submit your first response above to see your history.</p>
+                      </div>
+                  ) : (
+                      <div className="space-y-6">
+                          {submittedResponses.map(response => (
+                              <AgentResponseHistoryCard
+                                  key={response.id}
+                                  response={response}
+                                  allPrompts={prompts}
+                              />
+                          ))}
+                      </div>
+                  )}
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
