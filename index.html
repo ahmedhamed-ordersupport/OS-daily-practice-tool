@@ -23,11 +23,12 @@ import {
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
-  signInAnonymously, 
+  signInAnonymously, // Keeping for internal Firebase operations, though not explicitly used for login
   onAuthStateChanged,
   updateProfile, 
   createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword 
+  signInWithEmailAndPassword,
+  signOut
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -41,12 +42,10 @@ import {
   updateDoc
 } from 'firebase/firestore';
 
-// Load Tailwind CSS script for styling
-
 // --- New Firebase Setup (Using your provided config) ---
 const NEW_FIREBASE_CONFIG = {
-  // UPDATED API KEY: AIzaSyDl-ntwuz9qn2tXDwwNCxvfqEKos3rte6Y
-  apiKey: "AIzaSyDl-ntwuz9qn2tXDwwNCxvfqEKos3rte6Y",
+  // UPDATED API KEY: AIzaSyDkXOuZGZ_vMQJPAIFe3ujRAoiN3BLFhoQ
+  apiKey: "AIzaSyDkXOuZGZ_vMQJPAIFe3ujRAoiN3BLFhoQ",
   authDomain: "os-daily-practice-data.firebaseapp.com",
   projectId: "os-daily-practice-data",
   storageBucket: "os-daily-practice-data.firebasestorage.app",
@@ -59,6 +58,9 @@ const app = initializeApp(NEW_FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// --- ROLE DEFINITION ---
+const ADMIN_EMAIL = 'ahmed.hamed@tempo.fit';
+
 // --- Custom Tempo Colors ---
 // Primary Accent (Red/Orange) for SMS and highlights: #ef6d4f
 const COLOR_SMS = '#ef6d4f'; 
@@ -66,9 +68,6 @@ const COLOR_SMS = '#ef6d4f';
 const COLOR_QUIZ = '#485484';
 
 // --- Constants & Utils ---
-// IMPORTANT: To ensure compatibility with GitHub Pages, we use a reliable, external image URL.
-const LOGO_URL = "https://play-lh.googleusercontent.com/ZvXwylZYLMWrhTbpMKpehJWBhg9VcHoiovOHh4oRA3dU_e9tQp0gYRzkRp29QkAxhI4=w240-h480-rw";
-
 const MODES = {
   SMS: { 
     id: 'sms', 
@@ -96,21 +95,15 @@ const formatDate = (timestamp) => {
          new Date(timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
-// --- Components (No changes needed in component structure, only in data handling functions) ---
+// --- Components ---
 
-const Header = ({ theme, toggleTheme, userRole, currentUser }) => (
+const Header = ({ theme, toggleTheme, userRole, currentUser, onSignOut }) => (
   <header className="sticky top-0 z-50 w-full backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 transition-colors duration-300">
     <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        {/* Logo using reliable external URL */}
-        <img 
-          src={LOGO_URL} 
-          alt="Tempo Logo" 
-          className="w-8 h-8 rounded-lg object-cover shadow-lg shadow-[#ef6d4f]/20"
-          onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/32x32/ef6d4f/ffffff?text=T"; }} 
-        />
+        <Shield size={24} className="text-[#ef6d4f] min-w-[24px]" />
         <span className="font-bold text-xl tracking-tight text-zinc-900 dark:text-white">
-          TEMPO<span className="text-[#ef6d4f]">PRACTICE</span>
+          SOS <span className="text-[#ef6d4f]">DAILY PRACTICE</span>
         </span>
       </div>
 
@@ -130,14 +123,18 @@ const Header = ({ theme, toggleTheme, userRole, currentUser }) => (
         </button>
         
         {currentUser && (
-          <div className="flex items-center gap-2 pl-2 border-l border-zinc-200 dark:border-zinc-700 ml-2">
+          <div className="flex items-center gap-3 pl-2 border-l border-zinc-200 dark:border-zinc-700 ml-2">
             <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-600 dark:text-zinc-400"
                  title={currentUser.displayName || 'Agent'}>
               {currentUser.displayName?.charAt(0).toUpperCase() || 'A'}
             </div>
-            <span className="text-sm font-medium hidden sm:block">
-              {currentUser.displayName || 'Agent'}
-            </span>
+            <button 
+                onClick={onSignOut}
+                className="text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-[#ef6d4f] transition-colors"
+                title="Sign Out"
+            >
+                <LogIn size={18} className="rotate-180" />
+            </button>
           </div>
         )}
       </div>
@@ -145,7 +142,8 @@ const Header = ({ theme, toggleTheme, userRole, currentUser }) => (
   </header>
 );
 
-const LoginScreen = ({ onSignIn, onSignUp, onAdminBypass }) => {
+// onAdminBypass prop is removed from LoginScreen
+const LoginScreen = ({ onSignIn, onSignUp }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState(''); // Agent Name/ID for sign up only
@@ -165,7 +163,6 @@ const LoginScreen = ({ onSignIn, onSignUp, onAdminBypass }) => {
         await onSignIn(email, password);
       }
     } catch (err) {
-      // Firebase errors are handled in the main component and re-thrown as user-friendly strings
       setError(err.message); 
     } finally {
       setLoading(false);
@@ -176,13 +173,9 @@ const LoginScreen = ({ onSignIn, onSignUp, onAdminBypass }) => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4 transition-colors duration-300">
       <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-xl p-8 border border-zinc-200 dark:border-zinc-800">
         <div className="flex justify-center mb-6">
-          {/* Logo using reliable external URL (Large) */}
-          <img 
-            src={LOGO_URL} 
-            alt="Tempo Logo" 
-            className="w-16 h-16 rounded-2xl object-cover shadow-xl shadow-[#ef6d4f]/30"
-            onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/64x64/ef6d4f/ffffff?text=LOGO"; }} 
-          />
+          <div className="w-16 h-16 rounded-2xl bg-[#ef6d4f] flex items-center justify-center shadow-xl shadow-[#ef6d4f]/30">
+            <Shield size={36} className="text-white" />
+          </div>
         </div>
         <h2 className="text-2xl font-bold text-center text-zinc-900 dark:text-white mb-2">
           {isSigningUp ? 'Create Agent Account' : 'Agent Sign In'}
@@ -265,13 +258,7 @@ const LoginScreen = ({ onSignIn, onSignUp, onAdminBypass }) => {
 
       </div>
 
-      {/* Hidden Admin Bypass for Managers */}
-      <button 
-        onClick={onAdminBypass}
-        className="mt-6 text-xs text-zinc-400 dark:text-zinc-600 hover:text-[#ef6d4f] transition-colors flex items-center gap-1 opacity-70 hover:opacity-100"
-      >
-        <Shield size={12} /> Manager/Admin Bypass
-      </button>
+      {/* Admin Bypass is now removed. Admin access is solely based on email address. */}
     </div>
   );
 };
@@ -533,8 +520,7 @@ const ResponseCard = ({ prompt, mode, onSubmit }) => {
 export default function App() {
   const [theme, setTheme] = useState('dark');
   const [user, setUser] = useState(null);
-  // 'agent' is default. 
-  const [userRole, setUserRole] = useState('agent'); 
+  const [userRole, setUserRole] = useState('agent'); // Default role
   const [activeTab, setActiveTab] = useState('sms');
   const [prompts, setPrompts] = useState([]);
   const [responses, setResponses] = useState([]);
@@ -551,28 +537,31 @@ export default function App() {
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   
-  // Custom setter for Admin Bypass
-  const handleAdminBypass = async () => {
-    // Manager bypass now uses anonymous sign-in as a fallback/temp auth method
-    if (!user) {
-        try {
-            await signInAnonymously(auth);
-        } catch (error) {
-            console.error("Admin bypass sign-in failed", error);
-            return;
-        }
+  // Sign Out function
+  const handleSignOut = async () => {
+    try {
+        await signOut(auth);
+        setUser(null);
+        setUserRole('agent');
+    } catch (error) {
+        console.error("Sign Out failed", error);
     }
-    // Set the role to admin (this is internal for the manager's UI)
-    setUserRole('admin');
   };
-
-  // Firebase Auth Listener
+  
+  // Firebase Auth Listener - NOW HANDLES ROLE DETERMINATION
   useEffect(() => {
-    // Only listen for auth state changes; sign-in/sign-up is handled by LoginScreen
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      // If a user with a displayName is loaded, ensure they are in the agent role by default.
-      if (currentUser && currentUser.displayName) {
+      
+      if (currentUser && currentUser.email) {
+          // Check if the signed-in user is the defined admin
+          if (currentUser.email === ADMIN_EMAIL) {
+              setUserRole('admin');
+          } else {
+              setUserRole('agent');
+          }
+      } else {
+          // Reset role if no user is signed in
           setUserRole('agent');
       }
     });
@@ -583,8 +572,6 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
-    // --- UPDATED: Using simple collection paths in your custom project ---
-
     // Fetch Prompts
     const qPrompts = query(
       collection(db, 'prompts')
@@ -592,7 +579,6 @@ export default function App() {
     
     const unsubPrompts = onSnapshot(qPrompts, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort manually (newest first)
       data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setPrompts(data);
     }, (err) => console.error("Prompts error:", err));
@@ -616,16 +602,18 @@ export default function App() {
   // --- AUTH HANDLERS ---
   const handleSignIn = async (email, password) => {
     try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        // The user's displayName (name/ID) is already attached from their sign-up
-        setUser(userCredential.user); 
-        setUserRole('agent');
+        await signInWithEmailAndPassword(auth, email, password);
+        // The role determination logic is now inside the onAuthStateChanged listener
     } catch (error) {
         console.error("Sign-In failed", error);
+        // Improved Firebase error messaging
+        let errorMessage = "Login failed. Please check your credentials.";
         if (error.code === 'auth/invalid-email' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-             throw new Error("Invalid email or password. Please try again.");
+             errorMessage = "Invalid email or password. Please try again.";
+        } else if (error.code.includes('identity-toolkit-api-has-not-been-used')) {
+             errorMessage = "Authentication API is not enabled on your Firebase project. Please enable Email/Password sign-in in your Firebase Console and check the Google Cloud API settings.";
         }
-        throw new Error("Login failed. Please check your credentials.");
+        throw new Error(errorMessage);
     }
   };
 
@@ -636,21 +624,19 @@ export default function App() {
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         
-        // CRUCIAL: Store the Agent's name/ID as the displayName for tracking
         await updateProfile(userCredential.user, { displayName: name });
-        
-        // Update local state and set role
-        setUser({ ...userCredential.user, displayName: name }); 
-        setUserRole('agent');
+        // The role determination logic is now inside the onAuthStateChanged listener
     } catch (error) {
         console.error("Sign-Up failed", error);
+        let errorMessage = "Account creation failed. Please check your inputs.";
         if (error.code === 'auth/email-already-in-use') {
-            throw new Error("This email is already registered. Please sign in instead.");
+            errorMessage = "This email is already registered. Please sign in instead.";
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = "Password is too weak. Must be at least 6 characters.";
+        } else if (error.code.includes('identity-toolkit-api-has-not-been-used')) {
+             errorMessage = "Authentication API is not enabled on your Firebase project. Please enable Email/Password sign-in in your Firebase Console and check the Google Cloud API settings.";
         }
-         if (error.code === 'auth/weak-password') {
-            throw new Error("Password is too weak. Must be at least 6 characters.");
-        }
-        throw new Error("Account creation failed. Please check your inputs.");
+        throw new Error(errorMessage);
     }
   };
   // --- END AUTH HANDLERS ---
@@ -682,11 +668,9 @@ export default function App() {
       await addDoc(collection(db, 'responses'), {
         promptId,
         userId: user.uid,
-        // Use the authenticated user's displayName (Agent ID/Name)
         userName: user.displayName || 'Agent', 
         responseContent: content,
         timestamp: serverTimestamp(),
-        // Initialize feedback fields
         adminFeedback: null,
         feedbackTimestamp: null,
       });
@@ -707,27 +691,28 @@ export default function App() {
     }
   };
 
-  // Filter Logic (Relies on local state which is fine)
+  // Filter Logic 
   const filteredPrompts = prompts.filter(p => p.type === activeTab);
   
-  // Find which prompts the current user has already responded to in the active tab
   const userResponsePromptIds = responses
     .filter(r => r.userId === user?.uid)
     .map(r => r.promptId);
 
-  // Prompts awaiting response
   const activeChallenges = filteredPrompts.filter(p => !userResponsePromptIds.includes(p.id));
 
-  // User's submitted responses for the active tab (filtered by current user)
   const submittedResponses = responses
     .filter(r => r.userId === user?.uid && filteredPrompts.map(p => p.id).includes(r.promptId))
     .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
 
   // Authentication Check: Show login screen if user is not authenticated.
-  // We check for user.email as email/password users must have an email.
-  if (!user || (!user.email && userRole === 'agent')) {
-    return <LoginScreen onSignIn={handleSignIn} onSignUp={handleSignUp} onAdminBypass={handleAdminBypass} />;
+  if (!user || !user.email) {
+    return (
+      <LoginScreen 
+        onSignIn={handleSignIn} 
+        onSignUp={handleSignUp} 
+      />
+    );
   }
 
   return (
@@ -737,6 +722,7 @@ export default function App() {
         toggleTheme={toggleTheme} 
         userRole={userRole} 
         currentUser={user}
+        onSignOut={handleSignOut}
       />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
@@ -869,6 +855,7 @@ export default function App() {
                       <div className="text-center py-12 bg-zinc-100 dark:bg-zinc-900/50 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-800">
                           <p className="text-zinc-500">Submit your first response above to see your history.</p>
                       </div>
+                      
                   ) : (
                       <div className="space-y-6">
                           {submittedResponses.map(response => (
