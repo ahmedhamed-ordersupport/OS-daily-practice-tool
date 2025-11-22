@@ -23,7 +23,6 @@ import {
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
-  signInAnonymously, // Keeping for internal Firebase operations, though not explicitly used for login
   onAuthStateChanged,
   updateProfile, 
   createUserWithEmailAndPassword, 
@@ -44,8 +43,8 @@ import {
 
 // --- New Firebase Setup (Using your provided config) ---
 const NEW_FIREBASE_CONFIG = {
-  // UPDATED API KEY: AIzaSyDkXOuZGZ_vMQJPAIFe3ujRAoiN3BLFhoQ
-  apiKey: "AIzaSyDkXOuZGZ_vMQJPAIFe3ujRAoiN3BLFhoQ",
+  // UPDATED API KEY: AIzaSyDl-ntwuz9qn2tXDwwNCxvfqEKos3rte6Y
+  apiKey: "AIzaSyDl-ntwuz9qn2tXDwwNCxvfqEKos3rte6Y",
   authDomain: "os-daily-practice-data.firebaseapp.com",
   projectId: "os-daily-practice-data",
   storageBucket: "os-daily-practice-data.firebasestorage.app",
@@ -61,11 +60,18 @@ const db = getFirestore(app);
 // --- ROLE DEFINITION ---
 const ADMIN_EMAIL = 'ahmed.hamed@tempo.fit';
 
-// --- Custom Tempo Colors ---
-// Primary Accent (Red/Orange) for SMS and highlights: #ef6d4f
-const COLOR_SMS = '#ef6d4f'; 
-// Secondary Accent (Deep Blue/Purple) for Quiz: #485484
-const COLOR_QUIZ = '#485484';
+// --- Static Tempo Color Classes (FIX for Tailwind compilation issue) ---
+// Note: The original hex values were: SMS: #ef6d4f, QUIZ: #485484, NOTIFICATION: #f46d6d
+const TAILWIND_CLASSES = {
+  SMS_BG: 'bg-[#ef6d4f]',
+  SMS_TEXT: 'text-[#ef6d4f]',
+  QUIZ_BG: 'bg-[#485484]',
+  QUIZ_TEXT: 'text-[#485484]',
+  NOTIFICATION_BG: 'bg-[#f46d6d]',
+  // Secondary background colors for different states
+  QUIZ_BG_UPDATE: 'bg-[#485484]', // Using quiz color for feedback update button
+  HEADER_ACCENT: 'text-[#ef6d4f]', // Using SMS color for header accent
+};
 
 // --- Constants & Utils ---
 const MODES = {
@@ -73,8 +79,8 @@ const MODES = {
     id: 'sms', 
     label: 'Daily SMS', 
     icon: MessageSquare, 
-    color: `text-[${COLOR_SMS}]`, 
-    bg: `bg-[${COLOR_SMS}]`,     
+    color: TAILWIND_CLASSES.SMS_TEXT,
+    bg: TAILWIND_CLASSES.SMS_BG,
     persona: 'Coach Melissa',
     desc: 'Respond to member inquiries via text.'
   },
@@ -82,28 +88,41 @@ const MODES = {
     id: 'quiz', 
     label: 'Weekly Quiz', 
     icon: Trophy, 
-    color: `text-[${COLOR_QUIZ}]`, 
-    bg: `bg-[${COLOR_QUIZ}]`,     
+    color: TAILWIND_CLASSES.QUIZ_TEXT, 
+    bg: TAILWIND_CLASSES.QUIZ_BG,
     persona: 'Sales Expert',
     desc: 'Test your knowledge on retention and sales.'
   }
 };
 
 const formatDate = (timestamp) => {
-  if (!timestamp || !timestamp.seconds) return '';
+  if (!timestamp || !timestamp.seconds) return 'N/A';
   return new Date(timestamp.seconds * 1000).toLocaleDateString() + ' ' + 
          new Date(timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
 // --- Components ---
 
+const NotificationBadge = ({ count, modeBgClass }) => {
+    if (count === 0) return null;
+    return (
+        <span 
+            className={`absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 
+            ${modeBgClass || TAILWIND_CLASSES.NOTIFICATION_BG}
+            text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full leading-none shadow-md`}
+        >
+            {count}
+        </span>
+    );
+};
+
 const Header = ({ theme, toggleTheme, userRole, currentUser, onSignOut }) => (
   <header className="sticky top-0 z-50 w-full backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 transition-colors duration-300">
     <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <Shield size={24} className="text-[#ef6d4f] min-w-[24px]" />
+        <Shield size={24} className={TAILWIND_CLASSES.HEADER_ACCENT + ' min-w-[24px]'} />
         <span className="font-bold text-xl tracking-tight text-zinc-900 dark:text-white">
-          SOS <span className="text-[#ef6d4f]">DAILY PRACTICE</span>
+          SOS <span className={TAILWIND_CLASSES.HEADER_ACCENT}>DAILY PRACTICE</span>
         </span>
       </div>
 
@@ -142,7 +161,6 @@ const Header = ({ theme, toggleTheme, userRole, currentUser, onSignOut }) => (
   </header>
 );
 
-// onAdminBypass prop is removed from LoginScreen
 const LoginScreen = ({ onSignIn, onSignUp }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -173,7 +191,7 @@ const LoginScreen = ({ onSignIn, onSignUp }) => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4 transition-colors duration-300">
       <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-xl p-8 border border-zinc-200 dark:border-zinc-800">
         <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-[#ef6d4f] flex items-center justify-center shadow-xl shadow-[#ef6d4f]/30">
+          <div className={'w-16 h-16 rounded-2xl ' + TAILWIND_CLASSES.SMS_BG + ' flex items-center justify-center shadow-xl shadow-[#ef6d4f]/30'}>
             <Shield size={36} className="text-white" />
           </div>
         </div>
@@ -194,7 +212,7 @@ const LoginScreen = ({ onSignIn, onSignUp }) => {
                 type="text" 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 focus:ring-[#ef6d4f] focus:border-transparent outline-none transition-all"
+                className={'w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 ' + TAILWIND_CLASSES.SMS_TEXT + ' focus:border-transparent outline-none transition-all'}
                 placeholder="Agent Name or ID"
                 required={isSigningUp}
               />
@@ -207,7 +225,7 @@ const LoginScreen = ({ onSignIn, onSignUp }) => {
               type="email" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 focus:ring-[#ef6d4f] focus:border-transparent outline-none transition-all"
+              className={'w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 ' + TAILWIND_CLASSES.SMS_TEXT + ' focus:border-transparent outline-none transition-all'}
               placeholder="Email"
               required
             />
@@ -219,7 +237,7 @@ const LoginScreen = ({ onSignIn, onSignUp }) => {
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 focus:ring-[#ef6d4f] focus:border-transparent outline-none transition-all"
+              className={'w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 ' + TAILWIND_CLASSES.SMS_TEXT + ' focus:border-transparent outline-none transition-all'}
               placeholder="Password (min 6 characters)"
               required
             />
@@ -249,16 +267,12 @@ const LoginScreen = ({ onSignIn, onSignUp }) => {
             <button 
                 type="button"
                 onClick={() => setIsSigningUp(prev => !prev)}
-                className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-[#ef6d4f] transition-colors"
+                className={'text-sm text-zinc-500 dark:text-zinc-400 hover:' + TAILWIND_CLASSES.SMS_TEXT + ' transition-colors'}
             >
                 {isSigningUp ? 'Already have an account? Sign In' : "New agent? Create an account"}
             </button>
         </div>
-
-
       </div>
-
-      {/* Admin Bypass is now removed. Admin access is solely based on email address. */}
     </div>
   );
 };
@@ -279,15 +293,15 @@ const CreatePrompt = ({ activeTab, onCreate }) => {
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 mb-6 shadow-sm">
-      <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-        <Plus size={20} className="text-[#ef6d4f]" /> 
+      <h3 className={'text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2'}>
+        <Plus size={20} className={TAILWIND_CLASSES.HEADER_ACCENT} /> 
         Create New {mode.label}
       </h3>
       <form onSubmit={handleSubmit}>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          className="w-full p-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 focus:ring-[#ef6d4f] outline-none min-h-[120px] resize-none mb-4"
+          className={'w-full p-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 ' + TAILWIND_CLASSES.SMS_TEXT + ' outline-none min-h-[120px] resize-none mb-4'}
           placeholder={mode.id === 'sms' ? "Example: 'Hey Tempo, my screen is frozen during a workout. Help!'" : "Example: 'What are the three key pillars of our retention strategy?'"}
         />
         <div className="flex justify-end">
@@ -318,8 +332,8 @@ const FeedbackInput = ({ response, onPostFeedback }) => {
         setIsSubmitting(false);
     };
 
-    // Determine the button color based on whether feedback exists
-    const buttonBgClass = hasFeedback ? `bg-[${COLOR_QUIZ}]` : `bg-[${COLOR_SMS}]`;
+    // Determine the button color based on whether feedback exists - uses static classes
+    const buttonBgClass = hasFeedback ? TAILWIND_CLASSES.QUIZ_BG_UPDATE : TAILWIND_CLASSES.SMS_BG;
 
     return (
         <form onSubmit={handleSubmit} className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
@@ -327,7 +341,7 @@ const FeedbackInput = ({ response, onPostFeedback }) => {
             <textarea
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
-                className="w-full p-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-1 focus:ring-[#ef6d4f] outline-none text-sm resize-none"
+                className={'w-full p-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-1 ' + TAILWIND_CLASSES.SMS_TEXT + ' outline-none text-sm resize-none'}
                 placeholder="Enter coaching points or correction details..."
                 rows={3}
             />
@@ -416,7 +430,7 @@ const AgentResponseHistoryCard = ({ response, allPrompts }) => {
                     <p className="text-sm text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold text-[10px] flex items-center gap-2">
                         Your Submitted Response <span className="text-xs font-normal text-zinc-400">({formatDate(response.timestamp)})</span>
                     </p>
-                    {isExpanded ? <ChevronUp size={16} className="text-zinc-400" /> : <ChevronDown size={16} className="text-zinc-400" />}
+                    <ChevronDown size={16} className={`text-zinc-400 transform transition-transform ${isExpanded ? 'rotate-180' : 'rotate-0'}`} />
                 </div>
                 {/* Show truncated preview when collapsed */}
                 {!isExpanded && (
@@ -439,7 +453,7 @@ const AgentResponseHistoryCard = ({ response, allPrompts }) => {
                     <div className={`p-4 rounded-xl ${hasFeedback ? 'bg-zinc-100 dark:bg-zinc-800 border-l-4 border-[#ef6d4f]' : 'bg-zinc-50 dark:bg-zinc-950 text-zinc-500 italic'}`}>
                         <p className="text-sm font-bold mb-1 flex items-center gap-2">
                             {hasFeedback ? (
-                                <><Shield size={14} className="text-[#ef6d4f]" /> Admin Feedback ({formatDate(response.feedbackTimestamp)})</>
+                                <><Shield size={14} className={TAILWIND_CLASSES.HEADER_ACCENT} /> Admin Feedback ({formatDate(response.feedbackTimestamp)})</>
                             ) : (
                                 <><BookOpen size={14} /> Awaiting Feedback</>
                             )}
@@ -494,7 +508,7 @@ const ResponseCard = ({ prompt, mode, onSubmit }) => {
         <textarea
           value={response}
           onChange={(e) => setResponse(e.target.value)}
-          className="w-full p-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 focus:ring-[#ef6d4f] outline-none min-h-[100px] resize-none mb-4 placeholder:text-zinc-400"
+          className={'w-full p-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white focus:ring-2 ' + TAILWIND_CLASSES.SMS_TEXT + ' outline-none min-h-[100px] resize-none mb-4 placeholder:text-zinc-400'}
           placeholder={mode.id === 'sms' ? "Type your reply here..." : "Enter your answer..."}
         />
         <div className="flex justify-end">
@@ -603,10 +617,8 @@ export default function App() {
   const handleSignIn = async (email, password) => {
     try {
         await signInWithEmailAndPassword(auth, email, password);
-        // The role determination logic is now inside the onAuthStateChanged listener
     } catch (error) {
         console.error("Sign-In failed", error);
-        // Improved Firebase error messaging
         let errorMessage = "Login failed. Please check your credentials.";
         if (error.code === 'auth/invalid-email' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
              errorMessage = "Invalid email or password. Please try again.";
@@ -625,7 +637,6 @@ export default function App() {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         
         await updateProfile(userCredential.user, { displayName: name });
-        // The role determination logic is now inside the onAuthStateChanged listener
     } catch (error) {
         console.error("Sign-Up failed", error);
         let errorMessage = "Account creation failed. Please check your inputs.";
@@ -691,19 +702,45 @@ export default function App() {
     }
   };
 
-  // Filter Logic 
-  const filteredPrompts = prompts.filter(p => p.type === activeTab);
+  // --- Notification/Filtering Logic ---
   
-  const userResponsePromptIds = responses
-    .filter(r => r.userId === user?.uid)
-    .map(r => r.promptId);
+  // 1. Get IDs of all prompts the current user has responded to
+  const userResponsePromptIds = useMemo(() => 
+    responses
+      .filter(r => r.userId === user?.uid)
+      .map(r => r.promptId), 
+    [responses, user?.uid]
+  );
+  
+  // 2. Filter prompts by the current active tab
+  const filteredPrompts = useMemo(() => 
+    prompts.filter(p => p.type === activeTab),
+    [prompts, activeTab]
+  );
 
-  const activeChallenges = filteredPrompts.filter(p => !userResponsePromptIds.includes(p.id));
+  // 3. Determine which prompts are active (unanswered by the current user)
+  const activeChallenges = useMemo(() => 
+    filteredPrompts.filter(p => !userResponsePromptIds.includes(p.id)),
+    [filteredPrompts, userResponsePromptIds]
+  );
 
-  const submittedResponses = responses
-    .filter(r => r.userId === user?.uid && filteredPrompts.map(p => p.id).includes(r.promptId))
-    .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+  // 4. Calculate notification counts for ALL modes (for badges)
+  const getNotificationCount = (modeId) => {
+      const modePrompts = prompts.filter(p => p.type === modeId);
+      return modePrompts.filter(p => !userResponsePromptIds.includes(p.id)).length;
+  };
+  
+  const smsNotificationCount = getNotificationCount('sms');
+  const quizNotificationCount = getNotificationCount('quiz');
 
+  // 5. Get submitted responses for history view
+  const submittedResponses = useMemo(() => 
+    responses
+      .filter(r => r.userId === user?.uid)
+      .filter(r => filteredPrompts.map(p => p.id).includes(r.promptId))
+      .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)),
+    [responses, user?.uid, filteredPrompts]
+  );
 
   // Authentication Check: Show login screen if user is not authenticated.
   if (!user || !user.email) {
@@ -729,20 +766,32 @@ export default function App() {
         
         {/* Tabs */}
         <div className="flex space-x-1 bg-zinc-200 dark:bg-zinc-900 p-1 rounded-xl mb-8 w-full max-w-md mx-auto">
-          {[MODES.SMS, MODES.QUIZ].map((mode) => (
-            <button
-              key={mode.id}
-              onClick={() => setActiveTab(mode.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${
-                activeTab === mode.id 
-                  ? 'bg-white dark:bg-zinc-800 shadow-sm text-zinc-900 dark:text-white' 
-                  : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}
-            >
-              <mode.icon size={16} className={activeTab === mode.id ? mode.color : ''} />
-              {mode.label}
-            </button>
-          ))}
+          {[MODES.SMS, MODES.QUIZ].map((mode) => {
+            const isSMS = mode.id === 'sms';
+            const notificationCount = isSMS ? smsNotificationCount : quizNotificationCount;
+            const modeBgClass = isSMS ? MODES.SMS.bg : MODES.QUIZ.bg;
+
+            return (
+                <button
+                key={mode.id}
+                onClick={() => setActiveTab(mode.id)}
+                className={`flex-1 relative flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${
+                    activeTab === mode.id 
+                    ? 'bg-white dark:bg-zinc-800 shadow-sm text-zinc-900 dark:text-white' 
+                    : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`}
+                >
+                <mode.icon size={16} className={activeTab === mode.id ? mode.color : ''} />
+                {mode.label}
+                {userRole === 'agent' && notificationCount > 0 && (
+                    <NotificationBadge 
+                        count={notificationCount} 
+                        modeBgClass={modeBgClass}
+                    />
+                )}
+                </button>
+            );
+          })}
         </div>
 
         {/* Content Area */}
