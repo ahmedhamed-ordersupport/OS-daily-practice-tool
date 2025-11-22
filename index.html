@@ -1,60 +1,590 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="./favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="SOS Daily Practice Platform"
-    />
-    
-    <!-- CRITICAL FIX: This line tells the browser to look for all JavaScript and CSS files 
-         in the current folder. This fixes the blank page issue on GitHub Pages. -->
-    <base href="./"> 
-    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SOS Daily Practice</title>
     
-    <!-- Load Tailwind CSS -->
+    <!-- 1. Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Load React and ReactDOM from CDN (if needed for standalone, otherwise build process handles this) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
-
     <script>
-      // Configure Tailwind to include custom colors
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              'tempo-sms-bg': '#ef6d4f',
-              'tempo-quiz-bg': '#485484',
-              'tempo-notification': '#f46d6d',
-            },
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-            },
-          },
-        },
-      }
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'tempo-sms-bg': '#ef6d4f',
+                        'tempo-sms-text': '#ef6d4f',
+                        'tempo-quiz-bg': '#485484',
+                        'tempo-quiz-text': '#485484',
+                        'tempo-notification': '#f46d6d',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
     </script>
-    <style>
-      /* Ensure the application takes up the full viewport height */
-      #root {
-        min-height: 100vh;
-      }
-    </style>
-</head>
-<body class="dark">
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
+
+    <!-- 2. React & ReactDOM & Babel -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- 
-      If you are using Vite or React Scripts, your build tool will automatically inject 
-      the main script tag here (e.g., <script type="module" src="/src/main.jsx"></script>).
-    -->
+    <!-- 3. Lucide Icons (Vanilla JS version) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- 4. Firebase (Compat libraries for standalone use) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-zinc-50 text-zinc-900 transition-colors duration-300 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- FIREBASE CONFIG ---
+        // FIXED: Restored the original API Key for 'os-daily-practice-data' project
+        // The previous error occurred because the API Key belonged to a different project.
+        const firebaseConfig = {
+            apiKey: "AIzaSyDkXOuZGZ_vMQJPAIFe3ujRAoiN3BLFhoQ", 
+            authDomain: "os-daily-practice-data.firebaseapp.com",
+            projectId: "os-daily-practice-data",
+            storageBucket: "os-daily-practice-data.firebasestorage.app",
+            messagingSenderId: "854911444720",
+            appId: "1:854911444720:web:1406bd3843a3082a3fc435",
+            measurementId: "G-47TJTYBX20"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const ADMIN_EMAIL = 'ahmed.hamed@tempo.fit';
+
+        // --- CONSTANTS ---
+        const MODES = {
+            SMS: { 
+                id: 'sms', label: 'Daily SMS', 
+                iconName: 'message-square', 
+                color: 'text-tempo-sms-text', bg: 'bg-tempo-sms-bg', 
+                persona: 'Coach Melissa' 
+            },
+            QUIZ: { 
+                id: 'quiz', label: 'Weekly Quiz', 
+                iconName: 'trophy', 
+                color: 'text-tempo-quiz-text', bg: 'bg-tempo-quiz-bg', 
+                persona: 'Sales Expert' 
+            }
+        };
+
+        const formatDate = (timestamp) => {
+            if (!timestamp || !timestamp.seconds) return 'N/A';
+            return new Date(timestamp.seconds * 1000).toLocaleDateString() + ' ' + 
+                   new Date(timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        };
+
+        // --- COMPONENTS ---
+
+        // 1. Icon Component
+        const Icon = ({ name, className }) => {
+            const iconRef = useRef(null);
+
+            useEffect(() => {
+                if (!iconRef.current || typeof lucide === 'undefined') return;
+                iconRef.current.innerHTML = `<i data-lucide="${name}"></i>`;
+                lucide.createIcons({
+                    root: iconRef.current,
+                    nameAttr: 'data-lucide',
+                    attrs: { class: "w-full h-full" }
+                });
+            }, [name]);
+
+            return <span ref={iconRef} className={`inline-block ${className || ''}`} style={{ lineHeight: 0 }}></span>;
+        };
+
+        // 2. Notification Badge
+        const NotificationBadge = ({ count, modeBgClass }) => {
+            if (count === 0) return null;
+            return (
+                <span className={`absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 ${modeBgClass} text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full leading-none shadow-md`}>
+                    {count}
+                </span>
+            );
+        };
+
+        // 3. Header
+        const Header = ({ theme, toggleTheme, userRole, currentUser, onSignOut }) => {
+            return (
+                <header className="sticky top-0 z-50 w-full backdrop-blur-md border-b border-zinc-200 bg-white/80 transition-colors duration-300">
+                    <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Icon name="shield" className="text-tempo-sms-text w-6 h-6" />
+                            <span className="font-bold text-xl tracking-tight text-zinc-900">
+                                SOS <span className="text-tempo-sms-text">DAILY PRACTICE</span>
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-full bg-zinc-100 text-zinc-600">
+                                {userRole === 'admin' ? <Icon name="shield" className="w-3 h-3" /> : <Icon name="user" className="w-3 h-3" />}
+                                {userRole === 'admin' ? 'Manager View' : 'Agent View'}
+                            </div>
+                            
+                            {currentUser && (
+                                <div className="flex items-center gap-3 pl-2 border-l border-zinc-200 ml-2">
+                                    <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center text-xs font-bold text-zinc-600" title={currentUser.displayName}>
+                                        {currentUser.displayName?.charAt(0).toUpperCase() || 'A'}
+                                    </div>
+                                    <button onClick={onSignOut} className="text-sm font-medium text-zinc-500 hover:text-tempo-sms-text transition-colors" title="Sign Out">
+                                        <Icon name="log-in" className="w-4 h-4 rotate-180" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </header>
+            );
+        };
+
+        // 4. Login Screen
+        const LoginScreen = ({ onSignIn, onSignUp }) => {
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [name, setName] = useState('');
+            const [isSigningUp, setIsSigningUp] = useState(false);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError(null);
+                setLoading(true);
+                try {
+                    if (isSigningUp) {
+                        await onSignUp(email, password, name);
+                    } else {
+                        await onSignIn(email, password);
+                    }
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 p-4">
+                    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-zinc-200">
+                        <div className="flex justify-center mb-6">
+                            <div className="w-16 h-16 rounded-2xl bg-tempo-sms-bg flex items-center justify-center shadow-xl shadow-red-500/30">
+                                <Icon name="shield" className="text-white w-9 h-9" />
+                            </div>
+                        </div>
+                        <h2 className="text-2xl font-bold text-center text-zinc-900 mb-2">
+                            {isSigningUp ? 'Create Agent Account' : 'Agent Sign In'}
+                        </h2>
+                        <p className="text-center text-zinc-500 mb-8">
+                            {isSigningUp ? 'Use your work email.' : 'Sign in to access your daily training.'}
+                        </p>
+                        
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {isSigningUp && (
+                                <div className="relative">
+                                    <div className="absolute left-3 top-3.5 text-zinc-400"><Icon name="user" className="w-4 h-4" /></div>
+                                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-300 focus:ring-2 focus:ring-tempo-sms-text focus:border-transparent outline-none" placeholder="Agent Name or ID" required={isSigningUp} />
+                                </div>
+                            )}
+                            <div className="relative">
+                                <div className="absolute left-3 top-3.5 text-zinc-400"><Icon name="mail" className="w-4 h-4" /></div>
+                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-300 focus:ring-2 focus:ring-tempo-sms-text focus:border-transparent outline-none" placeholder="Email" required />
+                            </div>
+                            <div className="relative">
+                                <div className="absolute left-3 top-3.5 text-zinc-400"><Icon name="lock" className="w-4 h-4" /></div>
+                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-300 focus:ring-2 focus:ring-tempo-sms-text focus:border-transparent outline-none" placeholder="Password (min 6 chars)" required />
+                            </div>
+                            {error && <div className="p-3 text-sm font-medium text-white bg-red-500 rounded-lg">{error}</div>}
+                            <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-zinc-900 text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
+                                {loading ? 'Processing...' : (isSigningUp ? 'Create Account' : 'Sign In')}
+                            </button>
+                        </form>
+                        <div className="mt-6 text-center">
+                            <button type="button" onClick={() => setIsSigningUp(prev => !prev)} className="text-sm text-zinc-500 hover:text-tempo-sms-text transition-colors">
+                                {isSigningUp ? 'Already have an account? Sign In' : "New agent? Create an account"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 5. Admin Components
+        const CreatePrompt = ({ activeTab, onCreate }) => {
+            const [content, setContent] = useState('');
+            const mode = activeTab === 'sms' ? MODES.SMS : MODES.QUIZ;
+            
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if(!content.trim()) return;
+                onCreate(content);
+                setContent('');
+            }
+
+            return (
+                <div className="bg-white rounded-2xl border border-zinc-200 p-6 mb-6 shadow-sm">
+                    <h3 className="text-lg font-semibold text-zinc-900 mb-4 flex items-center gap-2">
+                         <Icon name="plus" className="text-tempo-sms-text w-5 h-5" /> Create New {mode.label}
+                    </h3>
+                    <form onSubmit={handleSubmit}>
+                        <textarea value={content} onChange={(e) => setContent(e.target.value)} className="w-full p-4 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-tempo-sms-text outline-none min-h-[100px] mb-4" placeholder={`Type ${mode.label} content here...`} />
+                        <div className="flex justify-end">
+                            <button type="submit" disabled={!content.trim()} className={`px-6 py-2 rounded-lg font-medium text-white ${mode.bg} disabled:opacity-50`}>Post Challenge</button>
+                        </div>
+                    </form>
+                </div>
+            );
+        };
+
+        const FeedbackInput = ({ response, onPostFeedback }) => {
+            const [feedback, setFeedback] = useState(response.adminFeedback || '');
+            const [submitting, setSubmitting] = useState(false);
+            const hasFeedback = !!response.adminFeedback;
+            
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if(!feedback.trim()) return;
+                setSubmitting(true);
+                await onPostFeedback(response.id, feedback);
+                setSubmitting(false);
+            }
+
+            const btnClass = hasFeedback ? 'bg-tempo-quiz-bg' : 'bg-tempo-sms-bg';
+
+            return (
+                <form onSubmit={handleSubmit} className="mt-3 pt-3 border-t border-zinc-100">
+                    <label className="block text-xs font-bold uppercase text-zinc-500 mb-1">Admin Feedback</label>
+                    <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} className="w-full p-2 rounded-lg border border-zinc-300 text-sm focus:ring-1 focus:ring-tempo-sms-text outline-none" rows={3} placeholder="Feedback..." />
+                    <div className="flex justify-end mt-2">
+                        <button type="submit" disabled={!feedback.trim() || submitting} className={`px-4 py-1.5 rounded-lg text-sm font-medium text-white ${btnClass} hover:opacity-90 disabled:opacity-50`}>
+                            {submitting ? 'Saving...' : hasFeedback ? 'Update Feedback' : 'Post Feedback'}
+                        </button>
+                    </div>
+                </form>
+            )
+        }
+
+        const AdminResponseView = ({ responses, promptId, onPostFeedback }) => {
+            const relevant = responses.filter(r => r.promptId === promptId);
+            if (relevant.length === 0) return <div className="p-4 text-sm text-zinc-500 italic">No responses yet.</div>;
+
+            return (
+                <div className="mt-4 space-y-4">
+                    {relevant.map(r => (
+                        <div key={r.id} className="bg-white rounded-xl p-4 border border-zinc-200">
+                             <div className="flex justify-between items-start mb-2">
+                                <span className="font-medium text-zinc-900 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-zinc-200 flex items-center justify-center text-xs">{r.userName?.charAt(0)}</div>
+                                    {r.userName}
+                                </span>
+                                <span className="text-xs text-zinc-400">{formatDate(r.timestamp)}</span>
+                             </div>
+                             <p className="text-zinc-700 text-sm mb-2 whitespace-pre-wrap">{r.responseContent}</p>
+                             <FeedbackInput response={r} onPostFeedback={onPostFeedback} />
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        // 6. Agent Response Card
+        const AgentResponseHistoryCard = ({ response, allPrompts }) => {
+            const [isExpanded, setIsExpanded] = useState(false);
+            const hasFeedback = !!response.adminFeedback;
+            const prompt = allPrompts.find(p => p.id === response.promptId);
+            if (!prompt) return null;
+
+            const mode = prompt.type === 'sms' ? MODES.SMS : MODES.QUIZ;
+
+            return (
+                <div className="bg-white rounded-2xl border border-zinc-200 p-6 shadow-sm">
+                    <div className="flex justify-between items-center mb-4">
+                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide text-white ${mode.bg}`}>
+                           <Icon name={mode.iconName} className="w-3 h-3" /> {mode.label}
+                        </div>
+                        {hasFeedback && (
+                            <div className="text-xs font-semibold text-green-500 flex items-center gap-1">
+                                <Icon name="check-circle" className="w-3 h-3" /> Feedback Received
+                            </div>
+                        )}
+                    </div>
+                    <div className="mb-4 p-4 bg-zinc-50 rounded-lg border-l-4 border-zinc-300">
+                        <p className="text-sm text-zinc-500 mb-1 uppercase tracking-wider font-bold text-[10px]">Original Inquiry</p>
+                        <p className="text-zinc-800 italic">"{prompt.content}"</p>
+                    </div>
+                    <div className="cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                        <div className="flex justify-between items-center">
+                            <p className="text-sm text-zinc-500 uppercase tracking-wider font-bold text-[10px]">
+                                Your Response <span className="text-xs font-normal text-zinc-400">({formatDate(response.timestamp)})</span>
+                            </p>
+                            <Icon name="chevron-down" className={`text-zinc-400 w-4 h-4 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </div>
+                        {!isExpanded && <p className="text-zinc-700 mt-2 line-clamp-2 overflow-hidden">{response.responseContent}</p>}
+                    </div>
+                    {isExpanded && (
+                        <div className="mt-4 pt-4 border-t border-zinc-200 space-y-4">
+                            <div>
+                                <p className="text-sm text-zinc-500 mb-1 uppercase tracking-wider font-bold text-[10px]">Full Response</p>
+                                <p className="text-zinc-700 whitespace-pre-wrap">{response.responseContent}</p>
+                            </div>
+                            <div className={`p-4 rounded-xl ${hasFeedback ? 'bg-zinc-100 border-l-4 border-tempo-sms-text' : 'bg-zinc-50 text-zinc-500 italic'}`}>
+                                <p className="text-sm font-bold mb-1 flex items-center gap-2">
+                                    {hasFeedback ? <><Icon name="shield" className="w-3 h-3 text-tempo-sms-text" /> Admin Feedback</> : <><Icon name="book-open" className="w-3 h-3" /> Awaiting Feedback</>}
+                                </p>
+                                <p className="text-zinc-800 whitespace-pre-wrap">
+                                    {hasFeedback ? response.adminFeedback : "Your response is under review."}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const ResponseCard = ({ prompt, mode, onSubmit }) => {
+            const [text, setText] = useState('');
+            const [submitting, setSubmitting] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if(!text.trim()) return;
+                setSubmitting(true);
+                await onSubmit(prompt.id, text);
+                setSubmitting(false);
+                setText('');
+            }
+
+            return (
+                <div className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1 ${mode.bg}`}>
+                            <Icon name={mode.iconName} className="w-3 h-3" /> {mode.label}
+                        </span>
+                        <span className="text-xs text-zinc-400 flex items-center gap-1">
+                            <Icon name="clock" className="w-3 h-3" /> {formatDate(prompt.createdAt)}
+                        </span>
+                    </div>
+                    <h3 className="text-lg font-semibold text-zinc-800 mb-6 leading-relaxed">"{prompt.content}"</h3>
+                    
+                    <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-zinc-500">
+                        <Icon name="user" className="w-3 h-3" /> Acting as: <span className={mode.color}>{mode.persona}</span>
+                    </div>
+
+                    <form onSubmit={handleSubmit}>
+                        <textarea className="w-full p-3 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-tempo-sms-text outline-none text-sm min-h-[100px] mb-3" 
+                            placeholder="Type your response here..." value={text} onChange={e => setText(e.target.value)}></textarea>
+                        <div className="flex justify-end">
+                            <button type="submit" disabled={!text.trim() || submitting} className={`px-5 py-2 ${mode.bg} text-white rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2`}>
+                                {submitting ? 'Sending...' : <>Submit <Icon name="send" className="w-3 h-3" /></>}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            );
+        };
+
+        // --- MAIN APP COMPONENT ---
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [userRole, setUserRole] = useState('agent');
+            const [activeTab, setActiveTab] = useState('sms');
+            const [prompts, setPrompts] = useState([]);
+            const [responses, setResponses] = useState([]);
+            const [expandedPromptId, setExpandedPromptId] = useState(null);
+
+            // --- AUTH STATE ---
+            useEffect(() => {
+                return auth.onAuthStateChanged((u) => {
+                    setUser(u);
+                    if(u && u.email === ADMIN_EMAIL) setUserRole('admin');
+                    else setUserRole('agent');
+                });
+            }, []);
+
+            // --- DATA SYNC ---
+            useEffect(() => {
+                if (!user) return;
+                const unsubPrompts = db.collection('prompts').orderBy('createdAt', 'desc').onSnapshot(snap => {
+                    setPrompts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                });
+                const unsubRes = db.collection('responses').orderBy('timestamp', 'desc').onSnapshot(snap => {
+                    setResponses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                });
+                return () => { unsubPrompts(); unsubRes(); };
+            }, [user]);
+
+            // --- ACTIONS ---
+            const handleSignIn = async (email, pass) => {
+                try { await auth.signInWithEmailAndPassword(email, pass); } 
+                catch (e) { 
+                    console.error(e);
+                    alert(e.message); 
+                }
+            }
+
+            const handleSignUp = async (email, pass, name) => {
+                try { 
+                    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+                    await cred.user.updateProfile({ displayName: name });
+                } catch (e) { 
+                    console.error(e);
+                    alert(e.message); 
+                }
+            }
+
+            const handleCreatePrompt = async (content) => {
+                await db.collection('prompts').add({
+                    type: activeTab,
+                    content,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdBy: user.uid
+                });
+            };
+
+            const handleDeletePrompt = async (id) => {
+                 await db.collection('prompts').doc(id).delete();
+            };
+
+            const handleSubmitResponse = async (promptId, content) => {
+                await db.collection('responses').add({
+                    promptId,
+                    userId: user.uid,
+                    userName: user.displayName || 'Agent',
+                    responseContent: content,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    adminFeedback: null,
+                    feedbackTimestamp: null
+                });
+            };
+
+            const handlePostFeedback = async (respId, feedback) => {
+                await db.collection('responses').doc(respId).update({
+                    adminFeedback: feedback,
+                    feedbackTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            };
+
+            // Calculated States
+            const userResponsePromptIds = useMemo(() => responses.filter(r => r.userId === user?.uid).map(r => r.promptId), [responses, user]);
+            const filteredPrompts = useMemo(() => prompts.filter(p => p.type === activeTab), [prompts, activeTab]);
+            const activeChallenges = useMemo(() => filteredPrompts.filter(p => !userResponsePromptIds.includes(p.id)), [filteredPrompts, userResponsePromptIds]);
+            
+            const submittedResponses = useMemo(() => 
+                responses.filter(r => r.userId === user?.uid && filteredPrompts.find(p => p.id === r.promptId)),
+                [responses, user, filteredPrompts]
+            );
+
+            const getNotifCount = (type) => {
+                const typePrompts = prompts.filter(p => p.type === type);
+                return typePrompts.filter(p => !userResponsePromptIds.includes(p.id)).length;
+            };
+
+            if (!user) return <LoginScreen onSignIn={handleSignIn} onSignUp={handleSignUp} />;
+
+            return (
+                <div className="pb-12">
+                    <Header userRole={userRole} currentUser={user} onSignOut={() => auth.signOut()} />
+                    
+                    <main className="max-w-3xl mx-auto px-4 py-8">
+                        {/* TABS */}
+                        <div className="flex bg-zinc-200 p-1 rounded-xl mb-8">
+                            {['sms', 'quiz'].map(t => {
+                                const count = getNotifCount(t);
+                                return (
+                                    <button key={t} onClick={() => setActiveTab(t)} 
+                                        className={`flex-1 relative py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${activeTab === t ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`}>
+                                        <Icon name={t === 'sms' ? 'message-square' : 'trophy'} className="w-4 h-4" />
+                                        {t === 'sms' ? 'Daily SMS' : 'Weekly Quiz'}
+                                        {userRole === 'agent' && count > 0 && (
+                                            <NotificationBadge count={count} modeBgClass={t === 'sms' ? 'bg-tempo-sms-bg' : 'bg-tempo-quiz-bg'} />
+                                        )}
+                                    </button>
+                                )
+                            })}
+                        </div>
+
+                        {/* ADMIN VIEW */}
+                        {userRole === 'admin' && (
+                            <div className="space-y-8">
+                                <CreatePrompt activeTab={activeTab} onCreate={handleCreatePrompt} />
+                                <div className="space-y-4">
+                                    <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-widest">Active Prompts</h3>
+                                    {filteredPrompts.map(p => {
+                                        const respCount = responses.filter(r => r.promptId === p.id).length;
+                                        const isExpanded = expandedPromptId === p.id;
+                                        return (
+                                            <div key={p.id} className="bg-white rounded-xl border border-zinc-200 overflow-hidden shadow-sm">
+                                                <div className="p-5 cursor-pointer" onClick={() => setExpandedPromptId(isExpanded ? null : p.id)}>
+                                                    <div className="flex justify-between items-start gap-4">
+                                                        <div className="flex-1">
+                                                            <p className="font-medium text-zinc-800">{p.content}</p>
+                                                            <div className="flex items-center gap-3 mt-2 text-xs text-zinc-400">
+                                                                <span>{formatDate(p.createdAt)}</span>
+                                                                <span className="flex items-center gap-1"><Icon name="users" className="w-3 h-3" /> {respCount} responses</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col items-end gap-2">
+                                                            <button onClick={(e) => {e.stopPropagation(); handleDeletePrompt(p.id)}} className="text-zinc-400 hover:text-red-500"><Icon name="trash-2" className="w-4 h-4" /></button>
+                                                            <Icon name="chevron-down" className={`w-4 h-4 text-zinc-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {isExpanded && (
+                                                    <div className="bg-zinc-50 p-5 border-t border-zinc-200">
+                                                        <h4 className="text-xs font-bold uppercase text-zinc-400 mb-3">Responses</h4>
+                                                        <AdminResponseView responses={responses} promptId={p.id} onPostFeedback={handlePostFeedback} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* AGENT VIEW */}
+                        {userRole === 'agent' && (
+                            <div className="space-y-8">
+                                <div className="space-y-4">
+                                    <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-widest flex items-center gap-2">
+                                        Active Challenges <span className="bg-tempo-notification text-white px-1.5 rounded-full text-[10px]">{activeChallenges.length}</span>
+                                    </h3>
+                                    {activeChallenges.length === 0 && (
+                                        <div className="text-center py-10 border-2 border-dashed border-zinc-200 rounded-xl text-zinc-400">
+                                            No new challenges right now. Great job!
+                                        </div>
+                                    )}
+                                    {activeChallenges.map(p => (
+                                        <ResponseCard key={p.id} prompt={p} mode={MODES[activeTab.toUpperCase()]} onSubmit={handleSubmitResponse} />
+                                    ))}
+                                </div>
+
+                                <div className="space-y-4">
+                                    <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-widest">My History</h3>
+                                    {submittedResponses.length === 0 && <div className="text-center py-8 text-zinc-400 text-sm">No submissions yet.</div>}
+                                    {submittedResponses.map(r => <AgentResponseHistoryCard key={r.id} response={r} allPrompts={prompts} />)}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
