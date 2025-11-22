@@ -41,8 +41,9 @@ import {
   updateDoc
 } from 'firebase/firestore';
 
-// --- New Firebase Setup ---
+// --- New Firebase Setup (Using your provided config) ---
 const NEW_FIREBASE_CONFIG = {
+  // UPDATED API KEY: AIzaSyDl-ntwuz9qn2tXDwwNCxvfqEKos3rte6Y
   apiKey: "AIzaSyDl-ntwuz9qn2tXDwwNCxvfqEKos3rte6Y",
   authDomain: "os-daily-practice-data.firebaseapp.com",
   projectId: "os-daily-practice-data",
@@ -59,15 +60,17 @@ const db = getFirestore(app);
 // --- ROLE DEFINITION ---
 const ADMIN_EMAIL = 'ahmed.hamed@tempo.fit';
 
-// --- Static Tempo Color Classes ---
+// --- Static Tempo Color Classes (FIX for Tailwind compilation issue) ---
+// Note: The original hex values were: SMS: #ef6d4f, QUIZ: #485484, NOTIFICATION: #f46d6d
 const TAILWIND_CLASSES = {
   SMS_BG: 'bg-[#ef6d4f]',
   SMS_TEXT: 'text-[#ef6d4f]',
   QUIZ_BG: 'bg-[#485484]',
   QUIZ_TEXT: 'text-[#485484]',
   NOTIFICATION_BG: 'bg-[#f46d6d]',
-  QUIZ_BG_UPDATE: 'bg-[#485484]', 
-  HEADER_ACCENT: 'text-[#ef6d4f]', 
+  // Secondary background colors for different states
+  QUIZ_BG_UPDATE: 'bg-[#485484]', // Using quiz color for feedback update button
+  HEADER_ACCENT: 'text-[#ef6d4f]', // Using SMS color for header accent
 };
 
 // --- Constants & Utils ---
