@@ -7,63 +7,71 @@
     <meta name="description" content="SOS Daily Practice Platform">
     <title>SOS Daily Practice</title>
 
-    <!-- 1. Tailwind CSS (Styling) -->
+    <!-- 1. Fonts: Montserrat -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- 2. Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
-                    colors: {
-                        'tempo-sms-bg': '#ef6d4f',
-                        'tempo-sms-text': '#ef6d4f',
-                        'tempo-quiz-bg': '#485484',
-                        'tempo-quiz-text': '#485484',
-                        'tempo-notification': '#f46d6d',
-                    },
                     fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
+                        sans: ['Montserrat', 'sans-serif'],
+                    },
+                    colors: {
+                        tempo: {
+                            red: '#f46d6d',
+                            blue: '#88a2b2',
+                            yellow: '#ffeda0',
+                            purple: '#485484',
+                            orange: '#ef6d4f',
+                            gold: '#c6a777',
+                            dark: '#1a1a1a',
+                            light: '#f8f9fa'
+                        }
                     }
                 }
             }
         }
     </script>
 
-    <!-- 2. React & ReactDOM (Core Framework) -->
+    <!-- 3. React & ReactDOM & Babel -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    
-    <!-- 3. Babel (Allows us to write React in this HTML file) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- 4. Lucide Icons (Visuals) -->
+    <!-- 4. Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- 5. Firebase (Compat libraries for standalone use) -->
+    <!-- 5. Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <style>
-        body { background-color: #fafafa; }
-        /* Custom scrollbar for cleaner look */
-        ::-webkit-scrollbar { width: 8px; }
+        body { background-color: #f8f9fa; font-family: 'Montserrat', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #ccc; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #999; }
     </style>
 </head>
 <body>
-    <!-- App Mount Point -->
     <div id="root"></div>
 
-    <!-- MAIN APPLICATION CODE -->
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
         // --- FIREBASE SETUP ---
         const firebaseConfig = {
-            // CORRECTED API KEY for os-daily-practice-data
             apiKey: "AIzaSyDkXOuZGZ_vMQJPAIFe3ujRAoiN3BLFhoQ",
             authDomain: "os-daily-practice-data.firebaseapp.com",
             projectId: "os-daily-practice-data",
@@ -73,7 +81,6 @@
             measurementId: "G-47TJTYBX20"
         };
 
-        // Initialize only if not already initialized
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
@@ -86,13 +93,15 @@
             SMS: { 
                 id: 'sms', label: 'Daily SMS', 
                 iconName: 'message-square', 
-                color: 'text-tempo-sms-text', bg: 'bg-tempo-sms-bg', 
+                color: 'text-tempo-orange', bg: 'bg-tempo-orange', border: 'border-tempo-orange',
+                lightBg: 'bg-orange-50',
                 persona: 'Coach Melissa' 
             },
             QUIZ: { 
                 id: 'quiz', label: 'Weekly Quiz', 
                 iconName: 'trophy', 
-                color: 'text-tempo-quiz-text', bg: 'bg-tempo-quiz-bg', 
+                color: 'text-tempo-purple', bg: 'bg-tempo-purple', border: 'border-tempo-purple',
+                lightBg: 'bg-indigo-50',
                 persona: 'Sales Expert' 
             }
         };
@@ -103,39 +112,109 @@
                    new Date(timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         };
 
-        // --- CUSTOM ICON COMPONENT (Browser Compatible) ---
+        // --- COMPONENTS ---
+
         const Icon = ({ name, className }) => {
             const iconRef = useRef(null);
-            
             useEffect(() => {
                if(iconRef.current && window.lucide) {
-                   // 1. Clean existing content to prevent duplication
                    iconRef.current.innerHTML = '';
-                   // 2. Create the icon element
                    const i = document.createElement('i');
                    i.setAttribute('data-lucide', name);
                    if(className) i.className = className;
-                   // 3. Append and transform
                    iconRef.current.appendChild(i);
-                   window.lucide.createIcons({
-                       root: iconRef.current,
-                       nameAttr: 'data-lucide',
-                       attrs: { class: className }
-                   });
+                   window.lucide.createIcons({ root: iconRef.current, nameAttr: 'data-lucide', attrs: { class: className } });
                }
             }, [name, className]);
-
             return <span ref={iconRef} className="inline-flex items-center justify-center" style={{lineHeight: 0}} />;
         };
-
-        // --- COMPONENTS ---
 
         const NotificationBadge = ({ count, modeBgClass }) => {
             if (count === 0) return null;
             return (
-                <span className={`absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 ${modeBgClass} text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full leading-none shadow-md`}>
+                <span className={`absolute -top-1 -right-2 ${modeBgClass} text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-sm border border-white`}>
                     {count}
                 </span>
+            );
+        };
+
+        // --- MARKDOWN RENDERER (For displaying Bold/Italic) ---
+        const MarkdownText = ({ text }) => {
+            if (!text) return null;
+            // Simple parser for **bold** and *italic*
+            const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+            return (
+                <span>
+                    {parts.map((part, i) => {
+                        if (part.startsWith('**') && part.endsWith('**')) {
+                            return <strong key={i} className="font-bold text-tempo-purple">{part.slice(2, -2)}</strong>;
+                        }
+                        if (part.startsWith('*') && part.endsWith('*')) {
+                            return <em key={i} className="italic text-tempo-purple">{part.slice(1, -1)}</em>;
+                        }
+                        return part;
+                    })}
+                </span>
+            );
+        };
+
+        // --- RICH TEXT EDITOR COMPONENT ---
+        const RichTextEditor = ({ value, onChange, placeholder }) => {
+            const textareaRef = useRef(null);
+
+            const insertFormat = (tag) => {
+                const textarea = textareaRef.current;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const text = textarea.value;
+                
+                let newText;
+                let newCursorPos;
+
+                if (tag === 'emoji') {
+                    // Simple emoji insert (simulated picker would be complex)
+                    const emoji = "👍"; 
+                    newText = text.slice(0, start) + emoji + text.slice(end);
+                    newCursorPos = start + emoji.length;
+                } else {
+                    const wrapper = tag === 'bold' ? '**' : '*';
+                    const selectedText = text.slice(start, end);
+                    newText = text.slice(0, start) + wrapper + selectedText + wrapper + text.slice(end);
+                    newCursorPos = end + (wrapper.length * 2);
+                }
+
+                onChange(newText);
+                
+                // Needs timeout to set focus back correctly after state update
+                setTimeout(() => {
+                    textarea.focus();
+                    textarea.setSelectionRange(newCursorPos, newCursorPos);
+                }, 0);
+            };
+
+            return (
+                <div className="border border-zinc-300 rounded-xl overflow-hidden bg-white focus-within:ring-2 focus-within:ring-tempo-blue transition-shadow">
+                    {/* Toolbar */}
+                    <div className="flex items-center gap-1 bg-zinc-50 border-b border-zinc-200 px-2 py-1.5">
+                        <button type="button" onClick={() => insertFormat('bold')} className="p-1.5 hover:bg-zinc-200 rounded text-zinc-600 font-bold" title="Bold">
+                            <span className="font-serif">B</span>
+                        </button>
+                        <button type="button" onClick={() => insertFormat('italic')} className="p-1.5 hover:bg-zinc-200 rounded text-zinc-600 italic" title="Italic">
+                            <span className="font-serif">I</span>
+                        </button>
+                        <div className="w-px h-4 bg-zinc-300 mx-1"></div>
+                        <button type="button" onClick={() => onChange(value + " 👍 ")} className="p-1.5 hover:bg-zinc-200 rounded text-lg" title="Thumbs Up">👍</button>
+                        <button type="button" onClick={() => onChange(value + " ✅ ")} className="p-1.5 hover:bg-zinc-200 rounded text-lg" title="Check">✅</button>
+                        <button type="button" onClick={() => onChange(value + " 🔥 ")} className="p-1.5 hover:bg-zinc-200 rounded text-lg" title="Fire">🔥</button>
+                    </div>
+                    <textarea 
+                        ref={textareaRef}
+                        className="w-full p-4 outline-none text-sm min-h-[120px] bg-white text-zinc-800 resize-y font-sans"
+                        placeholder={placeholder}
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                    />
+                </div>
             );
         };
 
@@ -143,23 +222,25 @@
             return (
                 <header className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b border-zinc-200 shadow-sm">
                     <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Icon name="shield" className="text-tempo-sms-text w-6 h-6" />
-                            <span className="font-bold text-xl tracking-tight text-zinc-900">
-                                SOS <span className="text-tempo-sms-text">DAILY PRACTICE</span>
+                        <div className="flex items-center gap-3">
+                            <div className="bg-tempo-orange p-1.5 rounded-lg shadow-sm">
+                                <Icon name="shield" className="text-white w-6 h-6" />
+                            </div>
+                            <span className="font-bold text-xl tracking-tight text-tempo-purple">
+                                SOS <span className="text-tempo-orange">DAILY PRACTICE</span>
                             </span>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full bg-zinc-100 text-zinc-600">
-                                {userRole === 'admin' ? <Icon name="shield" className="w-3 h-3 mr-1" /> : <Icon name="user" className="w-3 h-3 mr-1" />}
-                                {userRole === 'admin' ? 'Manager View' : 'Agent View'}
-                            </div>
+                        <div className="flex items-center gap-4">
                             {currentUser && (
-                                <div className="flex items-center gap-3 pl-3 border-l border-zinc-200">
-                                    <div className="w-8 h-8 rounded-full bg-zinc-800 text-white flex items-center justify-center text-xs font-bold" title={currentUser.email}>
+                                <div className="flex items-center gap-3 pl-4 border-l border-zinc-200">
+                                    <div className="flex flex-col items-end mr-1 hidden sm:flex">
+                                        <span className="text-xs font-bold text-tempo-purple">{currentUser.displayName || 'Agent'}</span>
+                                        <span className="text-[10px] text-zinc-400 uppercase tracking-wide">{userRole}</span>
+                                    </div>
+                                    <div className="w-9 h-9 rounded-full bg-tempo-purple text-tempo-yellow flex items-center justify-center text-sm font-bold shadow-sm border-2 border-white" title={currentUser.email}>
                                         {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'A'}
                                     </div>
-                                    <button onClick={onSignOut} className="text-zinc-400 hover:text-red-500 transition-colors" title="Sign Out">
+                                    <button onClick={onSignOut} className="text-zinc-400 hover:text-tempo-red transition-colors" title="Sign Out">
                                         <Icon name="log-out" className="w-5 h-5" />
                                     </button>
                                 </div>
@@ -189,22 +270,12 @@
                         await onSignIn(email, password);
                     }
                 } catch (err) {
-                    console.error("Login Error:", err);
+                    console.error(err);
                     let msg = err.message;
-                    
-                    // Detailed error handling for common issues
-                    if (err.code === 'auth/configuration-not-found') {
-                        msg = "Setup Error: API Key mismatch or Project not found. Ensure firebaseConfig matches your Firebase Console.";
-                    } else if (err.code === 'auth/email-already-in-use') {
-                        msg = "Email already registered. Please sign in instead.";
-                    } else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-                        msg = "Invalid email or password.";
-                    } else if (err.code === 'auth/weak-password') {
-                        msg = "Password should be at least 6 characters.";
-                    } else if (err.code && err.code.includes('identity-toolkit')) {
-                        msg = "API Error: Identity Toolkit API is not enabled. Check Google Cloud Console.";
-                    }
-                    
+                    if (err.code === 'auth/configuration-not-found') msg = "Setup Error: Please enable 'Email/Password' in Firebase Console > Authentication.";
+                    else if (err.code === 'auth/email-already-in-use') msg = "Email already registered.";
+                    else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') msg = "Invalid email or password.";
+                    else if (err.code === 'auth/weak-password') msg = "Password too short (min 6 chars).";
                     setError(msg);
                 } finally {
                     setLoading(false);
@@ -212,54 +283,54 @@
             };
 
             return (
-                <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 p-4">
-                    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-zinc-200 p-8">
-                        <div className="flex justify-center mb-6">
-                            <div className="w-16 h-16 bg-tempo-sms-bg rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/20">
-                                <Icon name="shield" className="text-white w-8 h-8" />
+                <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4 font-sans">
+                    <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-zinc-100 p-10 fade-in">
+                        <div className="flex justify-center mb-8">
+                            <div className="w-20 h-20 bg-tempo-orange rounded-3xl flex items-center justify-center shadow-xl shadow-orange-200 transform -rotate-3">
+                                <Icon name="shield" className="text-white w-10 h-10" />
                             </div>
                         </div>
-                        <h2 className="text-2xl font-bold text-center mb-2 text-zinc-900">
+                        <h2 className="text-3xl font-extrabold text-center mb-2 text-tempo-purple">
                             {isSignUp ? 'Join the Team' : 'Welcome Back'}
                         </h2>
-                        <p className="text-center text-zinc-500 mb-6 text-sm">
-                            {isSignUp ? 'Create your agent profile.' : 'Sign in to access daily challenges.'}
+                        <p className="text-center text-zinc-500 mb-8 font-medium">
+                            {isSignUp ? 'Create your agent profile to start.' : 'Sign in to access daily challenges.'}
                         </p>
 
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                        <form onSubmit={handleSubmit} className="space-y-5">
                             {isSignUp && (
-                                <div className="relative">
-                                    <div className="absolute left-3 top-3 text-zinc-400"><Icon name="user" className="w-5 h-5" /></div>
-                                    <input type="text" placeholder="Agent Name/ID (e.g. AG101)" className="w-full pl-10 p-3 rounded-lg border border-zinc-300 focus:ring-2 focus:ring-tempo-sms-text outline-none" 
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="user" className="w-5 h-5" /></div>
+                                    <input type="text" placeholder="Agent Name (e.g. AG101)" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 bg-zinc-50 focus:bg-white focus:border-tempo-orange focus:outline-none transition-all font-medium" 
                                         value={name} onChange={e => setName(e.target.value)} required />
                                 </div>
                             )}
-                            <div className="relative">
-                                <div className="absolute left-3 top-3 text-zinc-400"><Icon name="mail" className="w-5 h-5" /></div>
-                                <input type="email" placeholder="Email Address" className="w-full pl-10 p-3 rounded-lg border border-zinc-300 focus:ring-2 focus:ring-tempo-sms-text outline-none" 
+                            <div className="relative group">
+                                <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="mail" className="w-5 h-5" /></div>
+                                <input type="email" placeholder="Email Address" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 bg-zinc-50 focus:bg-white focus:border-tempo-orange focus:outline-none transition-all font-medium" 
                                     value={email} onChange={e => setEmail(e.target.value)} required />
                             </div>
-                            <div className="relative">
-                                <div className="absolute left-3 top-3 text-zinc-400"><Icon name="lock" className="w-5 h-5" /></div>
-                                <input type="password" placeholder="Password" className="w-full pl-10 p-3 rounded-lg border border-zinc-300 focus:ring-2 focus:ring-tempo-sms-text outline-none" 
+                            <div className="relative group">
+                                <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="lock" className="w-5 h-5" /></div>
+                                <input type="password" placeholder="Password" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 bg-zinc-50 focus:bg-white focus:border-tempo-orange focus:outline-none transition-all font-medium" 
                                     value={password} onChange={e => setPassword(e.target.value)} required />
                             </div>
 
                             {error && (
-                                <div className="p-3 text-sm bg-red-50 text-red-600 rounded-lg border border-red-100 flex items-start gap-2">
+                                <div className="p-4 text-sm bg-red-50 text-tempo-red rounded-xl border-l-4 border-tempo-red flex items-start gap-3">
                                     <Icon name="alert-circle" className="w-5 h-5 min-w-[20px]" />
-                                    <span>{error}</span>
+                                    <span className="font-medium">{error}</span>
                                 </div>
                             )}
 
-                            <button type="submit" disabled={loading} className="w-full bg-zinc-900 text-white font-bold py-3 rounded-lg hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                            <button type="submit" disabled={loading} className="w-full bg-tempo-purple text-white font-bold py-4 rounded-xl hover:opacity-90 hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-70 disabled:transform-none flex items-center justify-center gap-2 mt-4">
                                 {loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')}
-                                {!loading && <Icon name="arrow-right" className="w-4 h-4" />}
+                                {!loading && <Icon name="arrow-right" className="w-5 h-5" />}
                             </button>
                         </form>
 
-                        <div className="mt-6 text-center">
-                            <button onClick={() => { setIsSignUp(!isSignUp); setError(null); }} className="text-sm text-zinc-500 hover:text-tempo-sms-text font-medium">
+                        <div className="mt-8 text-center">
+                            <button onClick={() => { setIsSignUp(!isSignUp); setError(null); }} className="text-sm text-zinc-500 hover:text-tempo-orange font-semibold transition-colors">
                                 {isSignUp ? 'Already have an account? Sign In' : 'New agent? Create an account'}
                             </button>
                         </div>
@@ -268,42 +339,80 @@
             );
         };
 
+        const FeedbackInput = ({ response, onPostFeedback }) => {
+            const [feedback, setFeedback] = useState(response.adminFeedback || '');
+            const [status, setStatus] = useState('idle'); // idle, saving, success
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if(!feedback.trim()) return;
+                setStatus('saving');
+                await onPostFeedback(response.id, feedback);
+                setStatus('success');
+                // Reset to idle after 2 seconds
+                setTimeout(() => setStatus('idle'), 2000);
+            }
+
+            return (
+                <form onSubmit={handleSubmit} className="mt-4 pt-4 border-t border-zinc-100">
+                    <label className="block text-xs font-bold uppercase text-tempo-blue mb-2 flex items-center gap-2">
+                        <Icon name="pen-tool" className="w-3 h-3" /> Provide Coaching
+                    </label>
+                    
+                    <RichTextEditor value={feedback} onChange={setFeedback} placeholder="Write feedback here... use **bold** for emphasis." />
+
+                    <div className="flex justify-end mt-3">
+                        <button type="submit" disabled={!feedback.trim() || status === 'saving'} 
+                            className={`px-5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all
+                            ${status === 'success' ? 'bg-green-500 text-white' : 'bg-tempo-purple text-white hover:bg-opacity-90'}
+                            disabled:opacity-50`}
+                        >
+                            {status === 'saving' && 'Saving...'}
+                            {status === 'success' && <><Icon name="check" className="w-3 h-3" /> Saved!</>}
+                            {status === 'idle' && 'Submit Feedback'}
+                        </button>
+                    </div>
+                </form>
+            )
+        }
+
         const ResponseCard = ({ prompt, mode, onSubmit }) => {
             const [text, setText] = useState('');
-            
-            const handleSubmit = (e) => {
-                e.preventDefault();
+            const [submitting, setSubmitting] = useState(false);
+
+            const handleSubmit = async () => {
                 if(text.trim()) {
-                    onSubmit(prompt.id, text);
+                    setSubmitting(true);
+                    await onSubmit(prompt.id, text);
+                    setSubmitting(false);
                     setText('');
                 }
             }
 
             return (
-                <div className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm hover:shadow-md transition-shadow">
+                <div className={`bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm hover:shadow-md transition-all fade-in border-l-4 ${mode.border}`}>
                     <div className="flex justify-between items-start mb-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1 ${mode.bg}`}>
+                        <span className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 shadow-sm ${mode.bg}`}>
                             <Icon name={mode.iconName} className="w-3 h-3" /> {mode.label}
                         </span>
-                        <span className="text-xs text-zinc-400 flex items-center gap-1">
+                        <span className="text-xs text-zinc-400 flex items-center gap-1 font-medium">
                             <Icon name="clock" className="w-3 h-3" /> {formatDate(prompt.createdAt)}
                         </span>
                     </div>
-                    <h3 className="text-lg font-semibold text-zinc-800 mb-6 leading-relaxed">"{prompt.content}"</h3>
+                    <h3 className="text-lg font-bold text-tempo-purple mb-6 leading-relaxed font-sans">"{prompt.content}"</h3>
                     
                     <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-zinc-500">
-                        <Icon name="user" className="w-3 h-3" /> Acting as: <span className={mode.color}>{mode.persona}</span>
+                        <Icon name="user" className="w-3 h-3" /> Respond as: <span className={mode.color}>{mode.persona}</span>
                     </div>
 
-                    <form onSubmit={handleSubmit}>
-                        <textarea className="w-full p-3 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-tempo-sms-text outline-none text-sm min-h-[100px] mb-3" 
-                            placeholder="Type your response here..." value={text} onChange={e => setText(e.target.value)}></textarea>
+                    <div className="space-y-4">
+                        <RichTextEditor value={text} onChange={setText} placeholder="Type your response here..." />
                         <div className="flex justify-end">
-                            <button type="submit" disabled={!text.trim()} className={`px-5 py-2 ${mode.bg} text-white rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50 flex items-center gap-2`}>
-                                Submit <Icon name="send" className="w-3 h-3" />
+                            <button onClick={handleSubmit} disabled={!text.trim() || submitting} className={`px-6 py-2.5 ${mode.bg} text-white rounded-xl font-bold text-sm hover:brightness-110 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:transform-none flex items-center gap-2 shadow-md`}>
+                                {submitting ? 'Sending...' : <>Submit Response <Icon name="send" className="w-4 h-4" /></>}
                             </button>
                         </div>
-                    </form>
+                    </div>
                 </div>
             );
         };
@@ -317,38 +426,54 @@
             const hasFeedback = !!response.adminFeedback;
 
             return (
-                <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
+                <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-center cursor-pointer" onClick={() => setOpen(!open)}>
-                        <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full ${mode.bg}`}></div>
+                        <div className="flex items-center gap-4">
+                            <div className={`w-3 h-3 rounded-full ${mode.bg}`}></div>
                             <div className="flex flex-col">
-                                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Submitted {formatDate(response.timestamp)}</span>
-                                <span className="text-sm font-medium text-zinc-700 line-clamp-1">{response.responseContent}</span>
+                                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Submitted {formatDate(response.timestamp)}</span>
+                                <div className="text-sm font-medium text-tempo-purple line-clamp-1 max-w-[200px] sm:max-w-md">
+                                    <MarkdownText text={response.responseContent} />
+                                </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                             {hasFeedback && <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-[10px] font-bold uppercase flex items-center gap-1"><Icon name="check-circle" className="w-3 h-3" /> Feedback</span>}
-                             <Icon name="chevron-down" className={`w-4 h-4 text-zinc-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+                        <div className="flex items-center gap-3">
+                             {hasFeedback ? (
+                                <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1.5 border border-green-200">
+                                    <Icon name="check-circle" className="w-3 h-3" /> Reviewed
+                                </span>
+                             ) : (
+                                <span className="bg-zinc-100 text-zinc-500 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase border border-zinc-200">
+                                    Pending
+                                </span>
+                             )}
+                             <div className={`bg-zinc-100 p-1.5 rounded-full transition-transform duration-300 ${open ? 'rotate-180' : ''}`}>
+                                 <Icon name="chevron-down" className="w-4 h-4 text-zinc-500" />
+                             </div>
                         </div>
                     </div>
 
                     {open && (
-                        <div className="mt-4 pt-4 border-t border-zinc-100 space-y-4">
-                             <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-200">
-                                <span className="text-[10px] font-bold uppercase text-zinc-400 block mb-1">Question</span>
-                                <p className="text-sm text-zinc-800 italic">"{prompt.content}"</p>
+                        <div className="mt-5 pt-5 border-t border-zinc-100 space-y-5 fade-in">
+                             <div className={`${mode.lightBg} p-4 rounded-xl border border-zinc-200/50`}>
+                                <span className={`text-[10px] font-bold uppercase ${mode.color} block mb-2 flex items-center gap-1`}><Icon name="help-circle" className="w-3 h-3" /> Inquiry</span>
+                                <p className="text-sm text-zinc-800 font-medium">"{prompt.content}"</p>
                              </div>
-                             <div>
-                                <span className="text-[10px] font-bold uppercase text-zinc-400 block mb-1">Your Answer</span>
-                                <p className="text-sm text-zinc-700 whitespace-pre-wrap">{response.responseContent}</p>
+                             <div className="pl-2 border-l-2 border-zinc-200">
+                                <span className="text-[10px] font-bold uppercase text-zinc-400 block mb-2 ml-2">Your Answer</span>
+                                <div className="text-sm text-zinc-700 whitespace-pre-wrap ml-2 leading-relaxed">
+                                    <MarkdownText text={response.responseContent} />
+                                </div>
                              </div>
                              {hasFeedback ? (
-                                <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-                                    <span className="text-[10px] font-bold uppercase text-green-600 block mb-1 flex items-center gap-1"><Icon name="shield" className="w-3 h-3" /> Manager Feedback</span>
-                                    <p className="text-sm text-zinc-800">{response.adminFeedback}</p>
+                                <div className="bg-white p-5 rounded-xl border-l-4 border-green-500 shadow-sm">
+                                    <span className="text-[10px] font-bold uppercase text-green-600 block mb-2 flex items-center gap-1.5"><Icon name="shield" className="w-3 h-3" /> Manager Feedback</span>
+                                    <div className="text-sm text-zinc-800 leading-relaxed">
+                                        <MarkdownText text={response.adminFeedback} />
+                                    </div>
                                 </div>
                              ) : (
-                                 <p className="text-xs text-zinc-400 italic flex items-center gap-1"><Icon name="clock" className="w-3 h-3" /> Awaiting manager review...</p>
+                                 <p className="text-xs text-zinc-400 italic flex items-center gap-1.5 bg-zinc-50 p-3 rounded-lg"><Icon name="clock" className="w-3 h-3" /> Waiting for coach review...</p>
                              )}
                         </div>
                     )}
@@ -358,63 +483,75 @@
 
         const AdminView = ({ prompts, responses, handleCreatePrompt, handleDeletePrompt, handleFeedback, activeTab, setActiveTab }) => {
             const [expanded, setExpanded] = useState(null);
-            
             const filtered = prompts.filter(p => p.type === activeTab);
+            const mode = MODES[activeTab.toUpperCase()];
 
             return (
                 <div className="space-y-8">
-                    <div className="bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm">
-                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                            <Icon name="plus-circle" className="text-tempo-sms-text w-5 h-5" /> Create New Challenge
+                    <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-lg shadow-zinc-200/50 fade-in">
+                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-tempo-purple">
+                            <div className={`p-1.5 rounded-lg ${mode.bg} text-white`}><Icon name="plus" className="w-4 h-4" /></div> 
+                            Create {mode.label}
                         </h3>
                         <form onSubmit={handleCreatePrompt}>
-                            <textarea name="content" className="w-full p-4 border border-zinc-200 rounded-xl mb-4 min-h-[100px] outline-none focus:ring-2 focus:ring-tempo-sms-text" placeholder={`Type ${activeTab.toUpperCase()} content here...`}></textarea>
+                            <textarea name="content" className="w-full p-4 border-2 border-zinc-100 rounded-xl mb-4 min-h-[120px] outline-none focus:border-tempo-blue focus:ring-0 transition-all bg-zinc-50 focus:bg-white font-medium" placeholder={`Type ${activeTab.toUpperCase()} content here...`}></textarea>
                             <div className="flex justify-end">
-                                <button className="bg-zinc-900 text-white px-6 py-2 rounded-lg font-bold hover:opacity-90 transition">Post Challenge</button>
+                                <button className="bg-tempo-purple text-white px-8 py-2.5 rounded-xl font-bold hover:opacity-90 transition shadow-md hover:shadow-lg hover:-translate-y-0.5">Post Challenge</button>
                             </div>
                         </form>
                     </div>
 
-                    <div className="space-y-4">
-                        <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-widest">Active {activeTab} Prompts</h3>
+                    <div className="space-y-4 fade-in">
+                        <div className="flex items-center justify-between px-2">
+                            <h3 className="text-xs font-extrabold uppercase text-zinc-400 tracking-widest">Active Prompts</h3>
+                            <span className="text-xs font-bold bg-zinc-100 px-2 py-1 rounded-md text-zinc-500">{filtered.length}</span>
+                        </div>
+                        
+                        {filtered.length === 0 && (
+                            <div className="text-center py-12 border-2 border-dashed border-zinc-200 rounded-2xl">
+                                <p className="text-zinc-400 font-medium">No active prompts found.</p>
+                            </div>
+                        )}
+
                         {filtered.map(p => {
                             const promptResponses = responses.filter(r => r.promptId === p.id);
                             const isOpen = expanded === p.id;
                             
                             return (
-                                <div key={p.id} className="bg-white rounded-xl border border-zinc-200 overflow-hidden shadow-sm">
-                                    <div className="p-5 cursor-pointer hover:bg-zinc-50 transition" onClick={() => setExpanded(isOpen ? null : p.id)}>
+                                <div key={p.id} className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                                    <div className={`p-5 cursor-pointer transition ${isOpen ? 'bg-zinc-50' : 'hover:bg-zinc-50'}`} onClick={() => setExpanded(isOpen ? null : p.id)}>
                                         <div className="flex justify-between items-start">
-                                            <div className="flex-1">
-                                                <p className="font-medium text-zinc-800">{p.content}</p>
-                                                <div className="mt-2 flex gap-3 text-xs text-zinc-400">
-                                                    <span className="flex items-center gap-1"><Icon name="clock" className="w-3 h-3" /> {formatDate(p.createdAt)}</span>
-                                                    <span className="flex items-center gap-1"><Icon name="users" className="w-3 h-3" /> {promptResponses.length} responses</span>
+                                            <div className="flex-1 pr-4">
+                                                <p className="font-bold text-tempo-purple text-base">{p.content}</p>
+                                                <div className="mt-3 flex gap-4 text-xs font-medium text-zinc-400">
+                                                    <span className="flex items-center gap-1.5"><Icon name="clock" className="w-3 h-3" /> {formatDate(p.createdAt)}</span>
+                                                    <span className={`flex items-center gap-1.5 ${promptResponses.length > 0 ? 'text-tempo-blue' : ''}`}><Icon name="users" className="w-3 h-3" /> {promptResponses.length} responses</span>
                                                 </div>
                                             </div>
-                                            <div className="flex flex-col items-end gap-2">
-                                                <button onClick={(e) => {e.stopPropagation(); handleDeletePrompt(p.id)}} className="text-zinc-300 hover:text-red-500 p-1"><Icon name="trash-2" className="w-4 h-4" /></button>
-                                                <Icon name="chevron-down" className={`w-4 h-4 text-zinc-400 transition ${isOpen ? 'rotate-180' : ''}`} />
+                                            <div className="flex flex-col items-end gap-3">
+                                                <button onClick={(e) => {e.stopPropagation(); handleDeletePrompt(p.id)}} className="text-zinc-300 hover:text-tempo-red p-1.5 hover:bg-red-50 rounded-lg transition-colors"><Icon name="trash-2" className="w-4 h-4" /></button>
+                                                <div className={`bg-white border border-zinc-200 p-1.5 rounded-full transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
+                                                    <Icon name="chevron-down" className="w-4 h-4 text-zinc-400" />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                     {isOpen && (
-                                        <div className="bg-zinc-50 p-5 border-t border-zinc-200 space-y-4">
-                                            {promptResponses.length === 0 && <p className="text-sm text-zinc-500 italic">No responses yet.</p>}
+                                        <div className="bg-zinc-50 p-6 border-t border-zinc-200 space-y-6">
+                                            {promptResponses.length === 0 && <div className="text-center py-4 text-sm text-zinc-400 italic bg-white rounded-xl border border-zinc-100">No agent responses yet.</div>}
                                             {promptResponses.map(r => (
-                                                <div key={r.id} className="bg-white p-4 rounded-lg border border-zinc-200">
-                                                    <div className="flex justify-between mb-2">
-                                                        <span className="font-bold text-sm flex items-center gap-2"><Icon name="user" className="w-3 h-3" /> {r.userName}</span>
-                                                        <span className="text-xs text-zinc-400">{formatDate(r.timestamp)}</span>
+                                                <div key={r.id} className="bg-white p-5 rounded-xl border border-zinc-200 shadow-sm">
+                                                    <div className="flex justify-between mb-3 pb-3 border-b border-zinc-50">
+                                                        <span className="font-bold text-sm flex items-center gap-2 text-tempo-purple">
+                                                            <div className="w-6 h-6 rounded-full bg-tempo-gold/20 text-tempo-gold flex items-center justify-center text-xs"><Icon name="user" className="w-3 h-3" /></div>
+                                                            {r.userName}
+                                                        </span>
+                                                        <span className="text-xs text-zinc-400 font-medium">{formatDate(r.timestamp)}</span>
                                                     </div>
-                                                    <p className="text-sm text-zinc-700 mb-3">{r.responseContent}</p>
-                                                    <form onSubmit={(e) => handleFeedback(e, r.id)} className="pt-3 border-t border-zinc-100">
-                                                        <label className="text-[10px] font-bold uppercase text-zinc-400">Feedback</label>
-                                                        <textarea name="fb" defaultValue={r.adminFeedback} className="w-full p-2 mt-1 border border-zinc-200 rounded text-sm" rows="2" placeholder="Write feedback..."></textarea>
-                                                        <div className="flex justify-end mt-2">
-                                                            <button className="bg-tempo-quiz-bg text-white px-3 py-1 rounded text-xs font-bold hover:opacity-90">Save</button>
-                                                        </div>
-                                                    </form>
+                                                    <div className="text-sm text-zinc-700 mb-4 leading-relaxed whitespace-pre-wrap">
+                                                        <MarkdownText text={r.responseContent} />
+                                                    </div>
+                                                    <FeedbackInput response={r} onPostFeedback={handleFeedback} />
                                                 </div>
                                             ))}
                                         </div>
@@ -462,7 +599,6 @@
                 return () => { unsubPrompts(); unsubResponses(); };
             }, [user]);
 
-            // Handlers
             const handleSignIn = (email, pass) => auth.signInWithEmailAndPassword(email, pass);
             const handleSignUp = async (email, pass, name) => {
                 const cred = await auth.createUserWithEmailAndPassword(email, pass);
@@ -491,19 +627,16 @@
                 });
             };
 
-            const handleFeedback = (e, rid) => {
-                e.preventDefault();
-                const text = e.target.elements.fb.value;
-                if(!text.trim()) return;
+            const handleFeedback = (rid, text) => {
                 db.collection('responses').doc(rid).update({
                     adminFeedback: text, feedbackTimestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
             };
 
-            if(loadingAuth) return <div className="min-h-screen flex items-center justify-center text-zinc-400">Loading...</div>;
+            if(loadingAuth) return <div className="min-h-screen flex items-center justify-center text-tempo-blue font-bold animate-pulse">Loading...</div>;
             if (!user) return <LoginScreen onSignIn={handleSignIn} onSignUp={handleSignUp} />;
 
-            // Derived State for Agent View
+            // Derived State
             const myResponseIds = responses.filter(r => r.userId === user.uid).map(r => r.promptId);
             const currentPrompts = prompts.filter(p => p.type === activeTab);
             const activeChallenges = currentPrompts.filter(p => !myResponseIds.includes(p.id));
@@ -512,28 +645,29 @@
             const getCount = (type) => prompts.filter(p => p.type === type && !myResponseIds.includes(p.id)).length;
 
             return (
-                <div className="pb-12">
+                <div className="pb-20">
                     <Header userRole={userRole} currentUser={user} onSignOut={handleSignOut} />
                     
-                    <main className="max-w-3xl mx-auto px-4 py-8">
-                        {/* Navigation Tabs */}
-                        <div className="flex bg-zinc-200 p-1 rounded-xl mb-8 shadow-inner">
+                    <main className="max-w-4xl mx-auto px-4 py-8">
+                        <div className="flex bg-white p-1.5 rounded-2xl mb-10 shadow-sm border border-zinc-100">
                             {['sms', 'quiz'].map(t => {
                                 const count = getCount(t);
+                                const isActive = activeTab === t;
+                                const mode = MODES[t.toUpperCase()];
                                 return (
                                     <button key={t} onClick={() => setActiveTab(t)} 
-                                        className={`flex-1 relative py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${activeTab === t ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`}>
-                                        <Icon name={MODES[t.toUpperCase()].iconName} className="w-4 h-4" />
-                                        {MODES[t.toUpperCase()].label}
+                                        className={`flex-1 relative py-3 rounded-xl text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-300
+                                        ${isActive ? `${mode.bg} text-white shadow-md` : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'}`}>
+                                        <Icon name={mode.iconName} className="w-4 h-4" />
+                                        {mode.label}
                                         {userRole === 'agent' && count > 0 && (
-                                            <NotificationBadge count={count} modeBgClass={t === 'sms' ? 'bg-tempo-sms-bg' : 'bg-tempo-quiz-bg'} />
+                                            <NotificationBadge count={count} modeBgClass={isActive ? 'bg-tempo-gold' : 'bg-tempo-red'} />
                                         )}
                                     </button>
                                 )
                             })}
                         </div>
 
-                        {/* Role Based View */}
                         {userRole === 'admin' ? (
                             <AdminView 
                                 prompts={prompts} 
@@ -542,16 +676,25 @@
                                 handleDeletePrompt={handleDeletePrompt} 
                                 handleFeedback={handleFeedback}
                                 activeTab={activeTab}
+                                setActiveTab={setActiveTab}
                             />
                         ) : (
-                            <div className="space-y-8 fade-in">
-                                <div className="space-y-4">
-                                    <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-widest flex items-center gap-2">
-                                        Active Challenges <span className="bg-tempo-notification text-white px-1.5 rounded-full text-[10px]">{activeChallenges.length}</span>
-                                    </h3>
+                            <div className="space-y-10 fade-in">
+                                <div className="space-y-5">
+                                    <div className="flex items-center justify-between px-1">
+                                        <h3 className="text-xs font-extrabold uppercase text-tempo-blue tracking-widest flex items-center gap-2">
+                                            Active Challenges
+                                        </h3>
+                                        <span className="bg-tempo-orange/10 text-tempo-orange px-2 py-0.5 rounded-md text-xs font-bold">{activeChallenges.length} New</span>
+                                    </div>
+                                    
                                     {activeChallenges.length === 0 && (
-                                        <div className="text-center py-10 border-2 border-dashed border-zinc-200 rounded-xl text-zinc-400">
-                                            No active challenges. You're all caught up!
+                                        <div className="text-center py-16 border-2 border-dashed border-zinc-200 rounded-3xl bg-white">
+                                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                <Icon name="check" className="text-green-600 w-6 h-6" />
+                                            </div>
+                                            <p className="text-zinc-800 font-bold">All caught up!</p>
+                                            <p className="text-zinc-400 text-sm">Great job, no new challenges.</p>
                                         </div>
                                     )}
                                     {activeChallenges.map(p => (
@@ -559,9 +702,9 @@
                                     ))}
                                 </div>
 
-                                <div className="space-y-4">
-                                    <h3 className="text-xs font-bold uppercase text-zinc-400 tracking-widest">My History</h3>
-                                    {myHistory.length === 0 && <div className="text-center py-8 text-zinc-400 text-sm">No submissions yet.</div>}
+                                <div className="space-y-5 pt-6 border-t border-zinc-200">
+                                    <h3 className="text-xs font-extrabold uppercase text-tempo-blue tracking-widest px-1">My History</h3>
+                                    {myHistory.length === 0 && <div className="text-center py-8 text-zinc-400 text-sm italic">No submissions yet.</div>}
                                     {myHistory.map(r => <HistoryCard key={r.id} response={r} allPrompts={prompts} />)}
                                 </div>
                             </div>
