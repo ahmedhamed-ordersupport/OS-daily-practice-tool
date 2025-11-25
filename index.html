@@ -57,7 +57,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <style>
-        body { background-color: #f8f9fa; font-family: 'Montserrat', sans-serif; }
+        /* Base styles with dark mode support */
+        body { @apply bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-white transition-colors duration-300; }
+        
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         
@@ -66,6 +68,8 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #999; }
+        .dark ::-webkit-scrollbar-thumb { background: #444; }
+        .dark ::-webkit-scrollbar-thumb:hover { background: #555; }
     </style>
 </head>
 <body>
@@ -90,7 +94,22 @@
         }
         const auth = firebase.auth();
         const db = firebase.firestore();
-        const ADMIN_EMAIL = 'ahmed.hamed@tempo.fit';
+
+        // --- UPDATED ADMIN LIST ---
+        const ADMIN_EMAILS = [
+            'ahmed.hamed@tempo.fit',
+            'fatma.mohammad@tempo.fit',
+            'hebasobky@tempo.fit',
+            'khaledsabban@tempo.fit'
+        ];
+
+        // --- EMOJI LIST ---
+        const EMOJIS = [
+            "👍", "👎", "❤️", "🔥", "✅", "❌", "🎉", "🤔", "👀", "💪", 
+            "👋", "🙌", "👏", "🤝", "🚀", "💡", "⭐", "🏆", "💯", "✨",
+            "😊", "😂", "😎", "😢", "😡", "🤯", "😱", "🤗", "🤫", "🫡",
+            "🏋️", "🧘", "🚴", "🤸", "🏃", "📞", "💻", "📱", "📧", "💬"
+        ];
 
         // --- CONSTANTS ---
         const MODES = {
@@ -98,14 +117,14 @@
                 id: 'sms', label: 'Daily SMS', 
                 iconName: 'message-square', 
                 color: 'text-tempo-orange', bg: 'bg-tempo-orange', border: 'border-tempo-orange',
-                lightBg: 'bg-orange-50',
+                lightBg: 'bg-orange-50 dark:bg-orange-900/20',
                 persona: 'Coach Melissa' 
             },
             QUIZ: { 
                 id: 'quiz', label: 'Weekly Quiz', 
                 iconName: 'trophy', 
                 color: 'text-tempo-purple', bg: 'bg-tempo-purple', border: 'border-tempo-purple',
-                lightBg: 'bg-indigo-50',
+                lightBg: 'bg-indigo-50 dark:bg-indigo-900/20',
                 persona: 'Sales Expert' 
             }
         };
@@ -136,25 +155,24 @@
         const NotificationBadge = ({ count, modeBgClass }) => {
             if (count === 0) return null;
             return (
-                <span className={`absolute -top-1 -right-2 ${modeBgClass} text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-sm border border-white`}>
+                <span className={`absolute -top-1 -right-2 ${modeBgClass} text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-sm border border-white dark:border-zinc-800`}>
                     {count}
                 </span>
             );
         };
 
-        // --- MARKDOWN RENDERER (For displaying Bold/Italic) ---
+        // --- MARKDOWN RENDERER ---
         const MarkdownText = ({ text }) => {
             if (!text) return null;
-            // Simple parser for **bold** and *italic*
             const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
             return (
                 <span>
                     {parts.map((part, i) => {
                         if (part.startsWith('**') && part.endsWith('**')) {
-                            return <strong key={i} className="font-bold text-tempo-purple">{part.slice(2, -2)}</strong>;
+                            return <strong key={i} className="font-bold text-tempo-purple dark:text-tempo-yellow">{part.slice(2, -2)}</strong>;
                         }
                         if (part.startsWith('*') && part.endsWith('*')) {
-                            return <em key={i} className="italic text-tempo-purple">{part.slice(1, -1)}</em>;
+                            return <em key={i} className="italic text-tempo-purple dark:text-tempo-yellow">{part.slice(1, -1)}</em>;
                         }
                         return part;
                     })}
@@ -165,6 +183,7 @@
         // --- RICH TEXT EDITOR COMPONENT ---
         const RichTextEditor = ({ value, onChange, placeholder }) => {
             const textareaRef = useRef(null);
+            const [showEmoji, setShowEmoji] = useState(false);
 
             const insertFormat = (tag) => {
                 const textarea = textareaRef.current;
@@ -175,11 +194,9 @@
                 let newText;
                 let newCursorPos;
 
-                if (tag === 'emoji') {
-                    // Simple emoji insert (simulated picker would be complex)
-                    const emoji = "👍"; 
-                    newText = text.slice(0, start) + emoji + text.slice(end);
-                    newCursorPos = start + emoji.length;
+                if (tag.length === 1 || tag.length === 2) { // Emoji logic check
+                     newText = text.slice(0, start) + tag + text.slice(end);
+                     newCursorPos = start + tag.length;
                 } else {
                     const wrapper = tag === 'bold' ? '**' : '*';
                     const selectedText = text.slice(start, end);
@@ -189,7 +206,6 @@
 
                 onChange(newText);
                 
-                // Needs timeout to set focus back correctly after state update
                 setTimeout(() => {
                     textarea.focus();
                     textarea.setSelectionRange(newCursorPos, newCursorPos);
@@ -197,23 +213,51 @@
             };
 
             return (
-                <div className="border border-zinc-300 rounded-xl overflow-hidden bg-white focus-within:ring-2 focus-within:ring-tempo-blue transition-shadow">
+                <div className="border border-zinc-300 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 focus-within:ring-2 focus-within:ring-tempo-blue transition-shadow relative">
                     {/* Toolbar */}
-                    <div className="flex items-center gap-1 bg-zinc-50 border-b border-zinc-200 px-2 py-1.5">
-                        <button type="button" onClick={() => insertFormat('bold')} className="p-1.5 hover:bg-zinc-200 rounded text-zinc-600 font-bold" title="Bold">
+                    <div className="flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 px-2 py-1.5">
+                        <button type="button" onClick={() => insertFormat('bold')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-300 font-bold" title="Bold">
                             <span className="font-serif">B</span>
                         </button>
-                        <button type="button" onClick={() => insertFormat('italic')} className="p-1.5 hover:bg-zinc-200 rounded text-zinc-600 italic" title="Italic">
+                        <button type="button" onClick={() => insertFormat('italic')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-300 italic" title="Italic">
                             <span className="font-serif">I</span>
                         </button>
-                        <div className="w-px h-4 bg-zinc-300 mx-1"></div>
-                        <button type="button" onClick={() => onChange(value + " 👍 ")} className="p-1.5 hover:bg-zinc-200 rounded text-lg" title="Thumbs Up">👍</button>
-                        <button type="button" onClick={() => onChange(value + " ✅ ")} className="p-1.5 hover:bg-zinc-200 rounded text-lg" title="Check">✅</button>
-                        <button type="button" onClick={() => onChange(value + " 🔥 ")} className="p-1.5 hover:bg-zinc-200 rounded text-lg" title="Fire">🔥</button>
+                        <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-600 mx-1"></div>
+                        
+                        {/* Emoji Trigger */}
+                        <div className="relative">
+                            <button 
+                                type="button" 
+                                onClick={() => setShowEmoji(!showEmoji)} 
+                                className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-300" 
+                                title="Insert Emoji"
+                            >
+                                <Icon name="smile" className="w-4 h-4" />
+                            </button>
+
+                            {/* Emoji Drawer */}
+                            {showEmoji && (
+                                <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setShowEmoji(false)}></div>
+                                    <div className="absolute top-8 left-0 z-20 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl p-2 w-64 grid grid-cols-8 gap-1 max-h-48 overflow-y-auto">
+                                        {EMOJIS.map(emoji => (
+                                            <button 
+                                                key={emoji}
+                                                type="button"
+                                                onClick={() => { insertFormat(emoji); setShowEmoji(false); }}
+                                                className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-lg flex items-center justify-center"
+                                            >
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                     <textarea 
                         ref={textareaRef}
-                        className="w-full p-4 outline-none text-sm min-h-[120px] bg-white text-zinc-800 resize-y font-sans"
+                        className="w-full p-4 outline-none text-sm min-h-[120px] bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 resize-y font-sans"
                         placeholder={placeholder}
                         value={value}
                         onChange={(e) => onChange(e.target.value)}
@@ -222,26 +266,34 @@
             );
         };
 
-        const Header = ({ userRole, currentUser, onSignOut }) => {
+        const Header = ({ theme, toggleTheme, userRole, currentUser, onSignOut }) => {
             return (
-                <header className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b border-zinc-200 shadow-sm">
+                <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 shadow-sm transition-colors duration-300">
                     <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="bg-tempo-orange p-1.5 rounded-lg shadow-sm">
                                 <Icon name="shield" className="text-white w-6 h-6" />
                             </div>
-                            <span className="font-bold text-xl tracking-tight text-tempo-purple">
+                            <span className="font-bold text-xl tracking-tight text-tempo-purple dark:text-white">
                                 SOS <span className="text-tempo-orange">DAILY PRACTICE</span>
                             </span>
                         </div>
                         <div className="flex items-center gap-4">
+                             <button 
+                                onClick={toggleTheme}
+                                className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors"
+                                title="Toggle Dark Mode"
+                            >
+                                {theme === 'dark' ? <Icon name="sun" className="w-5 h-5" /> : <Icon name="moon" className="w-5 h-5" />}
+                            </button>
+
                             {currentUser && (
-                                <div className="flex items-center gap-3 pl-4 border-l border-zinc-200">
+                                <div className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-700">
                                     <div className="flex flex-col items-end mr-1 hidden sm:flex">
-                                        <span className="text-xs font-bold text-tempo-purple">{currentUser.displayName || 'Agent'}</span>
-                                        <span className="text-[10px] text-zinc-400 uppercase tracking-wide">{userRole}</span>
+                                        <span className="text-xs font-bold text-tempo-purple dark:text-zinc-300">{currentUser.displayName || 'Agent'}</span>
+                                        <span className="text-[10px] text-zinc-400 uppercase tracking-wide">{userRole === 'admin' ? 'Admin' : 'Agent'}</span>
                                     </div>
-                                    <div className="w-9 h-9 rounded-full bg-tempo-purple text-tempo-yellow flex items-center justify-center text-sm font-bold shadow-sm border-2 border-white" title={currentUser.email}>
+                                    <div className="w-9 h-9 rounded-full bg-tempo-purple text-tempo-yellow flex items-center justify-center text-sm font-bold shadow-sm border-2 border-white dark:border-zinc-800" title={currentUser.email}>
                                         {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'A'}
                                     </div>
                                     <button onClick={onSignOut} className="text-zinc-400 hover:text-tempo-red transition-colors" title="Sign Out">
@@ -287,17 +339,17 @@
             };
 
             return (
-                <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4 font-sans">
-                    <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-zinc-100 p-10 fade-in">
+                <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-zinc-900 dark:to-black p-4 font-sans transition-colors duration-300">
+                    <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-100 dark:border-zinc-800 p-10 fade-in">
                         <div className="flex justify-center mb-8">
-                            <div className="w-20 h-20 bg-tempo-orange rounded-3xl flex items-center justify-center shadow-xl shadow-orange-200 transform -rotate-3">
+                            <div className="w-20 h-20 bg-tempo-orange rounded-3xl flex items-center justify-center shadow-xl shadow-orange-200 dark:shadow-none transform -rotate-3">
                                 <Icon name="shield" className="text-white w-10 h-10" />
                             </div>
                         </div>
-                        <h2 className="text-3xl font-extrabold text-center mb-2 text-tempo-purple">
+                        <h2 className="text-3xl font-extrabold text-center mb-2 text-tempo-purple dark:text-white">
                             {isSignUp ? 'Join the Team' : 'Welcome Back'}
                         </h2>
-                        <p className="text-center text-zinc-500 mb-8 font-medium">
+                        <p className="text-center text-zinc-500 dark:text-zinc-400 mb-8 font-medium">
                             {isSignUp ? 'Create your agent profile to start.' : 'Sign in to access daily challenges.'}
                         </p>
 
@@ -305,23 +357,23 @@
                             {isSignUp && (
                                 <div className="relative group">
                                     <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="user" className="w-5 h-5" /></div>
-                                    <input type="text" placeholder="Agent Name (e.g. AG101)" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 bg-zinc-50 focus:bg-white focus:border-tempo-orange focus:outline-none transition-all font-medium" 
+                                    <input type="text" placeholder="Agent Name (e.g. AG101)" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 dark:text-white focus:bg-white dark:focus:bg-zinc-900 focus:border-tempo-orange focus:outline-none transition-all font-medium" 
                                         value={name} onChange={e => setName(e.target.value)} required />
                                 </div>
                             )}
                             <div className="relative group">
                                 <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="mail" className="w-5 h-5" /></div>
-                                <input type="email" placeholder="Email Address" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 bg-zinc-50 focus:bg-white focus:border-tempo-orange focus:outline-none transition-all font-medium" 
+                                <input type="email" placeholder="Email Address" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 dark:text-white focus:bg-white dark:focus:bg-zinc-900 focus:border-tempo-orange focus:outline-none transition-all font-medium" 
                                     value={email} onChange={e => setEmail(e.target.value)} required />
                             </div>
                             <div className="relative group">
                                 <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="lock" className="w-5 h-5" /></div>
-                                <input type="password" placeholder="Password" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 bg-zinc-50 focus:bg-white focus:border-tempo-orange focus:outline-none transition-all font-medium" 
+                                <input type="password" placeholder="Password" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 dark:text-white focus:bg-white dark:focus:bg-zinc-900 focus:border-tempo-orange focus:outline-none transition-all font-medium" 
                                     value={password} onChange={e => setPassword(e.target.value)} required />
                             </div>
 
                             {error && (
-                                <div className="p-4 text-sm bg-red-50 text-tempo-red rounded-xl border-l-4 border-tempo-red flex items-start gap-3">
+                                <div className="p-4 text-sm bg-red-50 dark:bg-red-900/20 text-tempo-red dark:text-red-400 rounded-xl border-l-4 border-tempo-red flex items-start gap-3">
                                     <Icon name="alert-circle" className="w-5 h-5 min-w-[20px]" />
                                     <span className="font-medium">{error}</span>
                                 </div>
@@ -334,7 +386,7 @@
                         </form>
 
                         <div className="mt-8 text-center">
-                            <button onClick={() => { setIsSignUp(!isSignUp); setError(null); }} className="text-sm text-zinc-500 hover:text-tempo-orange font-semibold transition-colors">
+                            <button onClick={() => { setIsSignUp(!isSignUp); setError(null); }} className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-tempo-orange font-semibold transition-colors">
                                 {isSignUp ? 'Already have an account? Sign In' : 'New agent? Create an account'}
                             </button>
                         </div>
@@ -358,7 +410,7 @@
             }
 
             return (
-                <form onSubmit={handleSubmit} className="mt-4 pt-4 border-t border-zinc-100">
+                <form onSubmit={handleSubmit} className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-700">
                     <label className="block text-xs font-bold uppercase text-tempo-blue mb-2 flex items-center gap-2">
                         <Icon name="pen-tool" className="w-3 h-3" /> Provide Coaching
                     </label>
@@ -394,7 +446,7 @@
             }
 
             return (
-                <div className={`bg-white p-6 rounded-2xl border border-zinc-200 shadow-sm hover:shadow-md transition-all fade-in border-l-4 ${mode.border}`}>
+                <div className={`bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all fade-in border-l-4 ${mode.border}`}>
                     <div className="flex justify-between items-start mb-4">
                         <span className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 shadow-sm ${mode.bg}`}>
                             <Icon name={mode.iconName} className="w-3 h-3" /> {mode.label}
@@ -403,9 +455,9 @@
                             <Icon name="clock" className="w-3 h-3" /> {formatDate(prompt.createdAt)}
                         </span>
                     </div>
-                    <h3 className="text-lg font-bold text-tempo-purple mb-6 leading-relaxed font-sans">"{prompt.content}"</h3>
+                    <h3 className="text-lg font-bold text-tempo-purple dark:text-white mb-6 leading-relaxed font-sans">"{prompt.content}"</h3>
                     
-                    <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-zinc-500">
+                    <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
                         <Icon name="user" className="w-3 h-3" /> Respond as: <span className={mode.color}>{mode.persona}</span>
                     </div>
 
@@ -430,54 +482,54 @@
             const hasFeedback = !!response.adminFeedback;
 
             return (
-                <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-center cursor-pointer" onClick={() => setOpen(!open)}>
                         <div className="flex items-center gap-4">
                             <div className={`w-3 h-3 rounded-full ${mode.bg}`}></div>
                             <div className="flex flex-col">
                                 <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Submitted {formatDate(response.timestamp)}</span>
-                                <div className="text-sm font-medium text-tempo-purple line-clamp-1 max-w-[200px] sm:max-w-md">
+                                <div className="text-sm font-medium text-tempo-purple dark:text-white line-clamp-1 max-w-[200px] sm:max-w-md">
                                     <MarkdownText text={response.responseContent} />
                                 </div>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
                              {hasFeedback ? (
-                                <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1.5 border border-green-200">
+                                <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1.5 border border-green-200 dark:border-green-800">
                                     <Icon name="check-circle" className="w-3 h-3" /> Reviewed
                                 </span>
                              ) : (
-                                <span className="bg-zinc-100 text-zinc-500 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase border border-zinc-200">
+                                <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase border border-zinc-200 dark:border-zinc-700">
                                     Pending
                                 </span>
                              )}
-                             <div className={`bg-zinc-100 p-1.5 rounded-full transition-transform duration-300 ${open ? 'rotate-180' : ''}`}>
-                                 <Icon name="chevron-down" className="w-4 h-4 text-zinc-500" />
+                             <div className={`bg-zinc-100 dark:bg-zinc-800 p-1.5 rounded-full transition-transform duration-300 ${open ? 'rotate-180' : ''}`}>
+                                 <Icon name="chevron-down" className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
                              </div>
                         </div>
                     </div>
 
                     {open && (
-                        <div className="mt-5 pt-5 border-t border-zinc-100 space-y-5 fade-in">
-                             <div className={`${mode.lightBg} p-4 rounded-xl border border-zinc-200/50`}>
+                        <div className="mt-5 pt-5 border-t border-zinc-100 dark:border-zinc-800 space-y-5 fade-in">
+                             <div className={`${mode.lightBg} p-4 rounded-xl border border-zinc-200/50 dark:border-zinc-700/50`}>
                                 <span className={`text-[10px] font-bold uppercase ${mode.color} block mb-2 flex items-center gap-1`}><Icon name="help-circle" className="w-3 h-3" /> Inquiry</span>
-                                <p className="text-sm text-zinc-800 font-medium">"{prompt.content}"</p>
+                                <p className="text-sm text-zinc-800 dark:text-zinc-200 font-medium">"{prompt.content}"</p>
                              </div>
-                             <div className="pl-2 border-l-2 border-zinc-200">
+                             <div className="pl-2 border-l-2 border-zinc-200 dark:border-zinc-700">
                                 <span className="text-[10px] font-bold uppercase text-zinc-400 block mb-2 ml-2">Your Answer</span>
-                                <div className="text-sm text-zinc-700 whitespace-pre-wrap ml-2 leading-relaxed">
+                                <div className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap ml-2 leading-relaxed">
                                     <MarkdownText text={response.responseContent} />
                                 </div>
                              </div>
                              {hasFeedback ? (
-                                <div className="bg-white p-5 rounded-xl border-l-4 border-green-500 shadow-sm">
+                                <div className="bg-white dark:bg-zinc-900 p-5 rounded-xl border-l-4 border-green-500 shadow-sm">
                                     <span className="text-[10px] font-bold uppercase text-green-600 block mb-2 flex items-center gap-1.5"><Icon name="shield" className="w-3 h-3" /> Manager Feedback</span>
-                                    <div className="text-sm text-zinc-800 leading-relaxed">
+                                    <div className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">
                                         <MarkdownText text={response.adminFeedback} />
                                     </div>
                                 </div>
                              ) : (
-                                 <p className="text-xs text-zinc-400 italic flex items-center gap-1.5 bg-zinc-50 p-3 rounded-lg"><Icon name="clock" className="w-3 h-3" /> Waiting for coach review...</p>
+                                 <p className="text-xs text-zinc-400 italic flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-lg"><Icon name="clock" className="w-3 h-3" /> Waiting for coach review...</p>
                              )}
                         </div>
                     )}
@@ -492,13 +544,13 @@
 
             return (
                 <div className="space-y-8">
-                    <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-lg shadow-zinc-200/50 fade-in">
-                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-tempo-purple">
+                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-lg shadow-zinc-200/50 dark:shadow-none fade-in">
+                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-tempo-purple dark:text-white">
                             <div className={`p-1.5 rounded-lg ${mode.bg} text-white`}><Icon name="plus" className="w-4 h-4" /></div> 
                             Create {mode.label}
                         </h3>
                         <form onSubmit={handleCreatePrompt}>
-                            <textarea name="content" className="w-full p-4 border-2 border-zinc-100 rounded-xl mb-4 min-h-[120px] outline-none focus:border-tempo-blue focus:ring-0 transition-all bg-zinc-50 focus:bg-white font-medium" placeholder={`Type ${activeTab.toUpperCase()} content here...`}></textarea>
+                            <textarea name="content" className="w-full p-4 border-2 border-zinc-100 dark:border-zinc-700 rounded-xl mb-4 min-h-[120px] outline-none focus:border-tempo-blue focus:ring-0 transition-all bg-zinc-50 dark:bg-zinc-800 dark:text-white focus:bg-white dark:focus:bg-zinc-900 font-medium" placeholder={`Type ${activeTab.toUpperCase()} content here...`}></textarea>
                             <div className="flex justify-end">
                                 <button className="bg-tempo-purple text-white px-8 py-2.5 rounded-xl font-bold hover:opacity-90 transition shadow-md hover:shadow-lg hover:-translate-y-0.5">Post Challenge</button>
                             </div>
@@ -508,11 +560,11 @@
                     <div className="space-y-4 fade-in">
                         <div className="flex items-center justify-between px-2">
                             <h3 className="text-xs font-extrabold uppercase text-zinc-400 tracking-widest">Active Prompts</h3>
-                            <span className="text-xs font-bold bg-zinc-100 px-2 py-1 rounded-md text-zinc-500">{filtered.length}</span>
+                            <span className="text-xs font-bold bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md text-zinc-500 dark:text-zinc-400">{filtered.length}</span>
                         </div>
                         
                         {filtered.length === 0 && (
-                            <div className="text-center py-12 border-2 border-dashed border-zinc-200 rounded-2xl">
+                            <div className="text-center py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl">
                                 <p className="text-zinc-400 font-medium">No active prompts found.</p>
                             </div>
                         )}
@@ -522,37 +574,37 @@
                             const isOpen = expanded === p.id;
                             
                             return (
-                                <div key={p.id} className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
-                                    <div className={`p-5 cursor-pointer transition ${isOpen ? 'bg-zinc-50' : 'hover:bg-zinc-50'}`} onClick={() => setExpanded(isOpen ? null : p.id)}>
+                                <div key={p.id} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                                    <div className={`p-5 cursor-pointer transition ${isOpen ? 'bg-zinc-50 dark:bg-zinc-800' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'}`} onClick={() => setExpanded(isOpen ? null : p.id)}>
                                         <div className="flex justify-between items-start">
                                             <div className="flex-1 pr-4">
-                                                <p className="font-bold text-tempo-purple text-base">{p.content}</p>
+                                                <p className="font-bold text-tempo-purple dark:text-white text-base">{p.content}</p>
                                                 <div className="mt-3 flex gap-4 text-xs font-medium text-zinc-400">
                                                     <span className="flex items-center gap-1.5"><Icon name="clock" className="w-3 h-3" /> {formatDate(p.createdAt)}</span>
                                                     <span className={`flex items-center gap-1.5 ${promptResponses.length > 0 ? 'text-tempo-blue' : ''}`}><Icon name="users" className="w-3 h-3" /> {promptResponses.length} responses</span>
                                                 </div>
                                             </div>
                                             <div className="flex flex-col items-end gap-3">
-                                                <button onClick={(e) => {e.stopPropagation(); handleDeletePrompt(p.id)}} className="text-zinc-300 hover:text-tempo-red p-1.5 hover:bg-red-50 rounded-lg transition-colors"><Icon name="trash-2" className="w-4 h-4" /></button>
-                                                <div className={`bg-white border border-zinc-200 p-1.5 rounded-full transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
+                                                <button onClick={(e) => {e.stopPropagation(); handleDeletePrompt(p.id)}} className="text-zinc-300 hover:text-tempo-red p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Icon name="trash-2" className="w-4 h-4" /></button>
+                                                <div className={`bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 p-1.5 rounded-full transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
                                                     <Icon name="chevron-down" className="w-4 h-4 text-zinc-400" />
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                     {isOpen && (
-                                        <div className="bg-zinc-50 p-6 border-t border-zinc-200 space-y-6">
-                                            {promptResponses.length === 0 && <div className="text-center py-4 text-sm text-zinc-400 italic bg-white rounded-xl border border-zinc-100">No agent responses yet.</div>}
+                                        <div className="bg-zinc-50 dark:bg-zinc-800 p-6 border-t border-zinc-200 dark:border-zinc-700 space-y-6">
+                                            {promptResponses.length === 0 && <div className="text-center py-4 text-sm text-zinc-400 italic bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-700">No agent responses yet.</div>}
                                             {promptResponses.map(r => (
-                                                <div key={r.id} className="bg-white p-5 rounded-xl border border-zinc-200 shadow-sm">
-                                                    <div className="flex justify-between mb-3 pb-3 border-b border-zinc-50">
-                                                        <span className="font-bold text-sm flex items-center gap-2 text-tempo-purple">
+                                                <div key={r.id} className="bg-white dark:bg-zinc-900 p-5 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
+                                                    <div className="flex justify-between mb-3 pb-3 border-b border-zinc-50 dark:border-zinc-800">
+                                                        <span className="font-bold text-sm flex items-center gap-2 text-tempo-purple dark:text-white">
                                                             <div className="w-6 h-6 rounded-full bg-tempo-gold/20 text-tempo-gold flex items-center justify-center text-xs"><Icon name="user" className="w-3 h-3" /></div>
                                                             {r.userName}
                                                         </span>
                                                         <span className="text-xs text-zinc-400 font-medium">{formatDate(r.timestamp)}</span>
                                                     </div>
-                                                    <div className="text-sm text-zinc-700 mb-4 leading-relaxed whitespace-pre-wrap">
+                                                    <div className="text-sm text-zinc-700 dark:text-zinc-300 mb-4 leading-relaxed whitespace-pre-wrap">
                                                         <MarkdownText text={r.responseContent} />
                                                     </div>
                                                     <FeedbackInput response={r} onPostFeedback={handleFeedback} />
@@ -570,6 +622,7 @@
 
         // --- MAIN APP ---
         const App = () => {
+            const [theme, setTheme] = useState('light');
             const [user, setUser] = useState(null);
             const [userRole, setUserRole] = useState('agent');
             const [activeTab, setActiveTab] = useState('sms');
@@ -577,11 +630,25 @@
             const [responses, setResponses] = useState([]);
             const [loadingAuth, setLoadingAuth] = useState(true);
 
+            // Toggle Theme
+            const toggleTheme = () => {
+                setTheme(prev => prev === 'light' ? 'dark' : 'light');
+            };
+
+            // Apply Theme Effect
+            useEffect(() => {
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }, [theme]);
+
             // Auth Observer
             useEffect(() => {
                 const unsubscribe = auth.onAuthStateChanged((u) => {
                     setUser(u);
-                    if(u && u.email && u.email.toLowerCase() === ADMIN_EMAIL) {
+                    if(u && u.email && ADMIN_EMAILS.includes(u.email.toLowerCase())) {
                         setUserRole('admin');
                     } else {
                         setUserRole('agent');
@@ -637,7 +704,7 @@
                 });
             };
 
-            if(loadingAuth) return <div className="min-h-screen flex items-center justify-center text-tempo-blue font-bold animate-pulse">Loading...</div>;
+            if(loadingAuth) return <div className="min-h-screen flex items-center justify-center text-tempo-blue font-bold animate-pulse bg-zinc-50 dark:bg-zinc-950">Loading...</div>;
             if (!user) return <LoginScreen onSignIn={handleSignIn} onSignUp={handleSignUp} />;
 
             // Derived State
@@ -650,10 +717,10 @@
 
             return (
                 <div className="pb-20">
-                    <Header userRole={userRole} currentUser={user} onSignOut={handleSignOut} />
+                    <Header theme={theme} toggleTheme={toggleTheme} userRole={userRole} currentUser={user} onSignOut={handleSignOut} />
                     
                     <main className="max-w-4xl mx-auto px-4 py-8">
-                        <div className="flex bg-white p-1.5 rounded-2xl mb-10 shadow-sm border border-zinc-100">
+                        <div className="flex bg-white dark:bg-zinc-900 p-1.5 rounded-2xl mb-10 shadow-sm border border-zinc-100 dark:border-zinc-800">
                             {['sms', 'quiz'].map(t => {
                                 const count = getCount(t);
                                 const isActive = activeTab === t;
@@ -661,7 +728,7 @@
                                 return (
                                     <button key={t} onClick={() => setActiveTab(t)} 
                                         className={`flex-1 relative py-3 rounded-xl text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-300
-                                        ${isActive ? `${mode.bg} text-white shadow-md` : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'}`}>
+                                        ${isActive ? `${mode.bg} text-white shadow-md` : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}>
                                         <Icon name={mode.iconName} className="w-4 h-4" />
                                         {mode.label}
                                         {userRole === 'agent' && count > 0 && (
@@ -693,11 +760,11 @@
                                     </div>
                                     
                                     {activeChallenges.length === 0 && (
-                                        <div className="text-center py-16 border-2 border-dashed border-zinc-200 rounded-3xl bg-white">
-                                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                                <Icon name="check" className="text-green-600 w-6 h-6" />
+                                        <div className="text-center py-16 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl bg-white dark:bg-zinc-900">
+                                            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                <Icon name="check" className="text-green-600 dark:text-green-500 w-6 h-6" />
                                             </div>
-                                            <p className="text-zinc-800 font-bold">All caught up!</p>
+                                            <p className="text-zinc-800 dark:text-white font-bold">All caught up!</p>
                                             <p className="text-zinc-400 text-sm">Great job, no new challenges.</p>
                                         </div>
                                     )}
@@ -706,7 +773,7 @@
                                     ))}
                                 </div>
 
-                                <div className="space-y-5 pt-6 border-t border-zinc-200">
+                                <div className="space-y-5 pt-6 border-t border-zinc-200 dark:border-zinc-800">
                                     <h3 className="text-xs font-extrabold uppercase text-tempo-blue tracking-widest px-1">My History</h3>
                                     {myHistory.length === 0 && <div className="text-center py-8 text-zinc-400 text-sm italic">No submissions yet.</div>}
                                     {myHistory.map(r => <HistoryCard key={r.id} response={r} allPrompts={prompts} />)}
