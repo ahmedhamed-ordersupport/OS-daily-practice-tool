@@ -35,7 +35,11 @@
                             orange: '#ef6d4f',
                             gold: '#c6a777',
                             dark: '#1a1a1a',
-                            light: '#f8f9fa'
+                            light: '#f8f9fa',
+                            // Dark mode specific palettes
+                            darkbg: '#09090b', // Very deep dark
+                            darkcard: '#18181b', // Slightly lighter for cards
+                            darkinput: '#27272a',
                         }
                     }
                 }
@@ -58,7 +62,7 @@
 
     <style>
         /* Base styles with dark mode support */
-        body { @apply bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-white transition-colors duration-300; }
+        body { @apply bg-zinc-50 text-zinc-900 dark:bg-tempo-darkbg dark:text-white transition-colors duration-300; }
         
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -117,7 +121,7 @@
                 id: 'sms', label: 'Daily SMS', 
                 iconName: 'message-square', 
                 color: 'text-tempo-orange', bg: 'bg-tempo-orange', border: 'border-tempo-orange',
-                lightBg: 'bg-orange-50 dark:bg-orange-900/20',
+                lightBg: 'bg-orange-50 dark:bg-orange-900/10',
                 persona: 'Coach Melissa' 
             },
             QUIZ: { 
@@ -164,15 +168,26 @@
         // --- MARKDOWN RENDERER ---
         const MarkdownText = ({ text }) => {
             if (!text) return null;
-            const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+            // Parses **bold**, *italic*, and [link](url)
+            // Regex looks scary but it just splits by markdown patterns
+            const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|\[.*?\]\(.*?\))/g);
             return (
                 <span>
                     {parts.map((part, i) => {
+                        // Bold
                         if (part.startsWith('**') && part.endsWith('**')) {
-                            return <strong key={i} className="font-bold text-tempo-purple dark:text-tempo-yellow">{part.slice(2, -2)}</strong>;
+                            return <strong key={i} className="font-extrabold text-tempo-purple dark:text-tempo-yellow">{part.slice(2, -2)}</strong>;
                         }
+                        // Italic
                         if (part.startsWith('*') && part.endsWith('*')) {
                             return <em key={i} className="italic text-tempo-purple dark:text-tempo-yellow">{part.slice(1, -1)}</em>;
+                        }
+                        // Link
+                        if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
+                            const match = part.match(/\[(.*?)\]\((.*?)\)/);
+                            if (match) {
+                                return <a key={i} href={match[2]} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 underline decoration-dotted underline-offset-4">{match[1]}</a>;
+                            }
                         }
                         return part;
                     })}
@@ -194,7 +209,14 @@
                 let newText;
                 let newCursorPos;
 
-                if (tag.length === 1 || tag.length === 2) { // Emoji logic check
+                if (tag === 'link') {
+                    const url = prompt("Enter URL:");
+                    if (!url) return;
+                    const selected = text.slice(start, end) || "link";
+                    const insert = `[${selected}](${url})`;
+                    newText = text.slice(0, start) + insert + text.slice(end);
+                    newCursorPos = start + insert.length;
+                } else if (tag.length === 1 || tag.length === 2) { // Emoji
                      newText = text.slice(0, start) + tag + text.slice(end);
                      newCursorPos = start + tag.length;
                 } else {
@@ -213,7 +235,7 @@
             };
 
             return (
-                <div className="border border-zinc-300 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 focus-within:ring-2 focus-within:ring-tempo-blue transition-shadow relative">
+                <div className="border border-zinc-300 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-tempo-darkinput focus-within:ring-2 focus-within:ring-tempo-blue transition-shadow relative">
                     {/* Toolbar */}
                     <div className="flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 px-2 py-1.5">
                         <button type="button" onClick={() => insertFormat('bold')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-300 font-bold" title="Bold">
@@ -221,6 +243,9 @@
                         </button>
                         <button type="button" onClick={() => insertFormat('italic')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-300 italic" title="Italic">
                             <span className="font-serif">I</span>
+                        </button>
+                         <button type="button" onClick={() => insertFormat('link')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-300" title="Link">
+                            <Icon name="link" className="w-4 h-4" />
                         </button>
                         <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-600 mx-1"></div>
                         
@@ -257,7 +282,7 @@
                     </div>
                     <textarea 
                         ref={textareaRef}
-                        className="w-full p-4 outline-none text-sm min-h-[120px] bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 resize-y font-sans"
+                        className="w-full p-4 outline-none text-sm min-h-[120px] bg-transparent text-zinc-800 dark:text-zinc-100 resize-y font-sans"
                         placeholder={placeholder}
                         value={value}
                         onChange={(e) => onChange(e.target.value)}
@@ -266,9 +291,62 @@
             );
         };
 
+        // --- COMMENTS COMPONENT ---
+        const CommentsSection = ({ responseId, comments, onAddComment, currentUser }) => {
+            const [newComment, setNewComment] = useState('');
+            const [isSubmitting, setIsSubmitting] = useState(false);
+
+            const handleSend = async (e) => {
+                e.preventDefault();
+                if(!newComment.trim()) return;
+                setIsSubmitting(true);
+                await onAddComment(responseId, newComment);
+                setNewComment('');
+                setIsSubmitting(false);
+            };
+
+            return (
+                <div className="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                    <h4 className="text-xs font-bold uppercase text-zinc-400 mb-3 flex items-center gap-2">
+                        <Icon name="message-circle" className="w-3 h-3" /> Discussion
+                    </h4>
+                    
+                    {/* Existing Comments List */}
+                    <div className="space-y-3 mb-4">
+                        {(!comments || comments.length === 0) && (
+                            <p className="text-xs text-zinc-400 italic">No questions or comments yet.</p>
+                        )}
+                        {comments && comments.map((c, i) => (
+                            <div key={i} className={`flex flex-col ${c.email === currentUser.email ? 'items-end' : 'items-start'}`}>
+                                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${c.email === currentUser.email ? 'bg-tempo-blue/20 text-tempo-purple dark:text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'}`}>
+                                    <div className="text-[10px] font-bold opacity-75 mb-0.5">{c.author}</div>
+                                    <MarkdownText text={c.text} />
+                                </div>
+                                <span className="text-[10px] text-zinc-400 mt-1 px-1">{formatDate(c.timestamp)}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Add Comment Input */}
+                    <form onSubmit={handleSend} className="flex gap-2 items-end">
+                        <div className="flex-1">
+                            <RichTextEditor value={newComment} onChange={setNewComment} placeholder="Ask a question or reply..." />
+                        </div>
+                        <button 
+                            type="submit" 
+                            disabled={!newComment.trim() || isSubmitting}
+                            className="bg-tempo-purple text-white p-3 rounded-xl hover:opacity-90 disabled:opacity-50 transition-all h-[48px] flex items-center justify-center"
+                        >
+                            <Icon name="send" className="w-4 h-4" />
+                        </button>
+                    </form>
+                </div>
+            );
+        };
+
         const Header = ({ theme, toggleTheme, userRole, currentUser, onSignOut }) => {
             return (
-                <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 shadow-sm transition-colors duration-300">
+                <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-tempo-darkcard/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 shadow-sm transition-colors duration-300">
                     <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="bg-tempo-orange p-1.5 rounded-lg shadow-sm">
@@ -307,7 +385,7 @@
             );
         };
 
-        const LoginScreen = ({ onSignIn, onSignUp }) => {
+        const LoginScreen = ({ onSignIn, onSignUp, theme, toggleTheme }) => {
             const [isSignUp, setIsSignUp] = useState(false);
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
@@ -339,8 +417,18 @@
             };
 
             return (
-                <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-zinc-900 dark:to-black p-4 font-sans transition-colors duration-300">
-                    <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-100 dark:border-zinc-800 p-10 fade-in">
+                <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-zinc-900 dark:to-black p-4 font-sans transition-colors duration-300 relative">
+                    {/* Theme Toggle on Login */}
+                    <div className="absolute top-4 right-4">
+                         <button 
+                            onClick={toggleTheme}
+                            className="p-3 rounded-full bg-white dark:bg-zinc-800 shadow-md hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 transition-colors"
+                        >
+                            {theme === 'dark' ? <Icon name="sun" className="w-5 h-5" /> : <Icon name="moon" className="w-5 h-5" />}
+                        </button>
+                    </div>
+
+                    <div className="w-full max-w-md bg-white dark:bg-tempo-darkcard rounded-3xl shadow-xl border border-zinc-100 dark:border-zinc-800 p-10 fade-in">
                         <div className="flex justify-center mb-8">
                             <div className="w-20 h-20 bg-tempo-orange rounded-3xl flex items-center justify-center shadow-xl shadow-orange-200 dark:shadow-none transform -rotate-3">
                                 <Icon name="shield" className="text-white w-10 h-10" />
@@ -357,18 +445,18 @@
                             {isSignUp && (
                                 <div className="relative group">
                                     <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="user" className="w-5 h-5" /></div>
-                                    <input type="text" placeholder="Agent Name (e.g. AG101)" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 dark:text-white focus:bg-white dark:focus:bg-zinc-900 focus:border-tempo-orange focus:outline-none transition-all font-medium" 
+                                    <input type="text" placeholder="Agent Name (e.g. AG101)" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-tempo-darkinput dark:text-white focus:bg-white dark:focus:bg-tempo-darkinput focus:border-tempo-orange focus:outline-none transition-all font-medium" 
                                         value={name} onChange={e => setName(e.target.value)} required />
                                 </div>
                             )}
                             <div className="relative group">
                                 <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="mail" className="w-5 h-5" /></div>
-                                <input type="email" placeholder="Email Address" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 dark:text-white focus:bg-white dark:focus:bg-zinc-900 focus:border-tempo-orange focus:outline-none transition-all font-medium" 
+                                <input type="email" placeholder="Email Address" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-tempo-darkinput dark:text-white focus:bg-white dark:focus:bg-tempo-darkinput focus:border-tempo-orange focus:outline-none transition-all font-medium" 
                                     value={email} onChange={e => setEmail(e.target.value)} required />
                             </div>
                             <div className="relative group">
                                 <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="lock" className="w-5 h-5" /></div>
-                                <input type="password" placeholder="Password" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 dark:text-white focus:bg-white dark:focus:bg-zinc-900 focus:border-tempo-orange focus:outline-none transition-all font-medium" 
+                                <input type="password" placeholder="Password" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-tempo-darkinput dark:text-white focus:bg-white dark:focus:bg-tempo-darkinput focus:border-tempo-orange focus:outline-none transition-all font-medium" 
                                     value={password} onChange={e => setPassword(e.target.value)} required />
                             </div>
 
@@ -415,7 +503,7 @@
                         <Icon name="pen-tool" className="w-3 h-3" /> Provide Coaching
                     </label>
                     
-                    <RichTextEditor value={feedback} onChange={setFeedback} placeholder="Write feedback here... use **bold** for emphasis." />
+                    <RichTextEditor value={feedback} onChange={setFeedback} placeholder="Write feedback here..." />
 
                     <div className="flex justify-end mt-3">
                         <button type="submit" disabled={!feedback.trim() || status === 'saving'} 
@@ -446,7 +534,7 @@
             }
 
             return (
-                <div className={`bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all fade-in border-l-4 ${mode.border}`}>
+                <div className={`bg-white dark:bg-tempo-darkcard p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all fade-in border-l-4 ${mode.border}`}>
                     <div className="flex justify-between items-start mb-4">
                         <span className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 shadow-sm ${mode.bg}`}>
                             <Icon name={mode.iconName} className="w-3 h-3" /> {mode.label}
@@ -473,7 +561,7 @@
             );
         };
 
-        const HistoryCard = ({ response, allPrompts }) => {
+        const HistoryCard = ({ response, allPrompts, currentUser, onAddComment }) => {
             const [open, setOpen] = useState(false);
             
             const prompt = allPrompts.find(p => p.id === response.promptId);
@@ -482,7 +570,7 @@
             const hasFeedback = !!response.adminFeedback;
 
             return (
-                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                <div className="bg-white dark:bg-tempo-darkcard border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-center cursor-pointer" onClick={() => setOpen(!open)}>
                         <div className="flex items-center gap-4">
                             <div className={`w-3 h-3 rounded-full ${mode.bg}`}></div>
@@ -531,20 +619,28 @@
                              ) : (
                                  <p className="text-xs text-zinc-400 italic flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-lg"><Icon name="clock" className="w-3 h-3" /> Waiting for coach review...</p>
                              )}
+                             
+                             {/* --- DISCUSSION THREAD --- */}
+                             <CommentsSection 
+                                responseId={response.id} 
+                                comments={response.comments} 
+                                onAddComment={onAddComment} 
+                                currentUser={currentUser} 
+                             />
                         </div>
                     )}
                 </div>
             );
         }
 
-        const AdminView = ({ prompts, responses, handleCreatePrompt, handleDeletePrompt, handleFeedback, activeTab, setActiveTab }) => {
+        const AdminView = ({ prompts, responses, handleCreatePrompt, handleDeletePrompt, handleFeedback, handleAddComment, activeTab, setActiveTab, currentUser }) => {
             const [expanded, setExpanded] = useState(null);
             const filtered = prompts.filter(p => p.type === activeTab);
             const mode = MODES[activeTab.toUpperCase()];
 
             return (
                 <div className="space-y-8">
-                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-lg shadow-zinc-200/50 dark:shadow-none fade-in">
+                    <div className="bg-white dark:bg-tempo-darkcard p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-lg shadow-zinc-200/50 dark:shadow-none fade-in">
                         <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-tempo-purple dark:text-white">
                             <div className={`p-1.5 rounded-lg ${mode.bg} text-white`}><Icon name="plus" className="w-4 h-4" /></div> 
                             Create {mode.label}
@@ -574,7 +670,7 @@
                             const isOpen = expanded === p.id;
                             
                             return (
-                                <div key={p.id} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                                <div key={p.id} className="bg-white dark:bg-tempo-darkcard rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-md transition-all">
                                     <div className={`p-5 cursor-pointer transition ${isOpen ? 'bg-zinc-50 dark:bg-zinc-800' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'}`} onClick={() => setExpanded(isOpen ? null : p.id)}>
                                         <div className="flex justify-between items-start">
                                             <div className="flex-1 pr-4">
@@ -596,7 +692,7 @@
                                         <div className="bg-zinc-50 dark:bg-zinc-800 p-6 border-t border-zinc-200 dark:border-zinc-700 space-y-6">
                                             {promptResponses.length === 0 && <div className="text-center py-4 text-sm text-zinc-400 italic bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-700">No agent responses yet.</div>}
                                             {promptResponses.map(r => (
-                                                <div key={r.id} className="bg-white dark:bg-zinc-900 p-5 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
+                                                <div key={r.id} className="bg-white dark:bg-tempo-darkcard p-5 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
                                                     <div className="flex justify-between mb-3 pb-3 border-b border-zinc-50 dark:border-zinc-800">
                                                         <span className="font-bold text-sm flex items-center gap-2 text-tempo-purple dark:text-white">
                                                             <div className="w-6 h-6 rounded-full bg-tempo-gold/20 text-tempo-gold flex items-center justify-center text-xs"><Icon name="user" className="w-3 h-3" /></div>
@@ -608,6 +704,7 @@
                                                         <MarkdownText text={r.responseContent} />
                                                     </div>
                                                     <FeedbackInput response={r} onPostFeedback={handleFeedback} />
+                                                    <CommentsSection responseId={r.id} comments={r.comments} onAddComment={handleAddComment} currentUser={currentUser} />
                                                 </div>
                                             ))}
                                         </div>
@@ -694,7 +791,7 @@
                 db.collection('responses').add({
                     promptId: pid, userId: user.uid, userName: user.displayName || 'Agent',
                     responseContent: text, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    adminFeedback: null, feedbackTimestamp: null
+                    adminFeedback: null, feedbackTimestamp: null, comments: []
                 });
             };
 
@@ -704,8 +801,19 @@
                 });
             };
 
+            const handleAddComment = (rid, text) => {
+                db.collection('responses').doc(rid).update({
+                    comments: firebase.firestore.FieldValue.arrayUnion({
+                        text: text,
+                        author: user.displayName || user.email,
+                        email: user.email,
+                        timestamp: Date.now()
+                    })
+                });
+            };
+
             if(loadingAuth) return <div className="min-h-screen flex items-center justify-center text-tempo-blue font-bold animate-pulse bg-zinc-50 dark:bg-zinc-950">Loading...</div>;
-            if (!user) return <LoginScreen onSignIn={handleSignIn} onSignUp={handleSignUp} />;
+            if (!user) return <LoginScreen onSignIn={handleSignIn} onSignUp={handleSignUp} theme={theme} toggleTheme={toggleTheme} />;
 
             // Derived State
             const myResponseIds = responses.filter(r => r.userId === user.uid).map(r => r.promptId);
@@ -746,8 +854,10 @@
                                 handleCreatePrompt={handleCreatePrompt} 
                                 handleDeletePrompt={handleDeletePrompt} 
                                 handleFeedback={handleFeedback}
+                                handleAddComment={handleAddComment}
                                 activeTab={activeTab}
                                 setActiveTab={setActiveTab}
+                                currentUser={user}
                             />
                         ) : (
                             <div className="space-y-10 fade-in">
@@ -776,7 +886,7 @@
                                 <div className="space-y-5 pt-6 border-t border-zinc-200 dark:border-zinc-800">
                                     <h3 className="text-xs font-extrabold uppercase text-tempo-blue tracking-widest px-1">My History</h3>
                                     {myHistory.length === 0 && <div className="text-center py-8 text-zinc-400 text-sm italic">No submissions yet.</div>}
-                                    {myHistory.map(r => <HistoryCard key={r.id} response={r} allPrompts={prompts} />)}
+                                    {myHistory.map(r => <HistoryCard key={r.id} response={r} allPrompts={prompts} currentUser={user} onAddComment={handleAddComment} />)}
                                 </div>
                             </div>
                         )}
