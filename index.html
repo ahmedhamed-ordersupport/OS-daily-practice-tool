@@ -61,31 +61,44 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <style>
-        /* Base styles with dark mode support */
+        /* Base styles */
         body { @apply bg-zinc-50 text-zinc-900 dark:bg-tempo-darkbg dark:text-white transition-colors duration-300; }
-        
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #999; }
-        .dark ::-webkit-scrollbar-thumb { background: #444; }
-        .dark ::-webkit-scrollbar-thumb:hover { background: #555; }
-
-        /* Star Rating Fill Logic */
+        /* Loading/Error Screen */
+        #app-loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #f8f9fa; z-index: 9999; }
+        #app-error { position: fixed; inset: 0; padding: 2rem; display: none; flex-direction: column; align-items: center; justify-content: center; background: #fee2e2; color: #b91c1c; z-index: 10000; text-align: center; }
+        
         .star-filled { fill: currentColor; }
     </style>
 </head>
 <body>
+    <!-- Fallback Loading/Error UI -->
+    <div id="app-error">
+        <h2 class="text-2xl font-bold mb-2">Something went wrong</h2>
+        <p id="error-message" class="font-mono text-sm bg-white p-4 rounded shadow">Unknown Error</p>
+        <button onclick="window.location.reload()" class="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Reload Page</button>
+    </div>
+    
     <div id="root"></div>
+
+    <script>
+        // Global Error Handler to prevent Blank White Screen
+        window.onerror = function(message, source, lineno, colno, error) {
+            const errorDiv = document.getElementById('app-error');
+            const msgDiv = document.getElementById('error-message');
+            if(errorDiv && msgDiv) {
+                errorDiv.style.display = 'flex';
+                msgDiv.textContent = message + " (Line: " + lineno + ")";
+            }
+        };
+    </script>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // --- FIREBASE SETUP ---
+        // --- FIREBASE CONFIGURATION ---
         const firebaseConfig = {
             apiKey: "AIzaSyDkXOuZGZ_vMQJPAIFe3ujRAoiN3BLFhoQ",
             authDomain: "os-daily-practice-data.firebaseapp.com",
@@ -96,12 +109,14 @@
             measurementId: "G-47TJTYBX20"
         };
 
+        // Initialize Firebase safely
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
         const auth = firebase.auth();
         const db = firebase.firestore();
 
+        // --- SETTINGS ---
         const ADMIN_EMAILS = [
             'ahmed.hamed@tempo.fit',
             'fatma.mohammad@tempo.fit',
@@ -112,11 +127,9 @@
         const EMOJIS = [
             "👍", "👎", "❤️", "🔥", "✅", "❌", "🎉", "🤔", "👀", "💪", 
             "👋", "🙌", "👏", "🤝", "🚀", "💡", "⭐", "🏆", "💯", "✨",
-            "😊", "😂", "😎", "😢", "😡", "🤯", "😱", "🤗", "🤫", "🫡",
-            "🏋️", "🧘", "🚴", "🤸", "🏃", "📞", "💻", "📱", "📧", "💬"
+            "😊", "😂", "😎", "😢", "😡", "🤯", "😱", "🤗", "🤫", "🫡"
         ];
 
-        // --- CONSTANTS ---
         const MODES = {
             SMS: { 
                 id: 'sms', label: 'Daily SMS', 
@@ -134,6 +147,7 @@
             }
         };
 
+        // --- UTILS ---
         const formatDate = (timestamp) => {
             if (!timestamp || !timestamp.seconds) return 'Just now';
             return new Date(timestamp.seconds * 1000).toLocaleDateString() + ' ' + 
@@ -163,7 +177,7 @@
             return "text-tempo-red dark:text-red-400";
         }
 
-        // --- COMPONENTS ---
+        // --- REUSABLE COMPONENTS ---
 
         const Icon = ({ name, className, filled }) => {
             const iconRef = useRef(null);
@@ -196,18 +210,11 @@
                     <div className="flex items-center gap-1">
                         {[1, 2, 3, 4, 5].map((star) => (
                             <button 
-                                key={star}
-                                type="button"
-                                disabled={readonly}
-                                onClick={() => !readonly && onRate(star)}
+                                key={star} type="button" disabled={readonly} onClick={() => !readonly && onRate(star)}
                                 className={`focus:outline-none transition-transform ${readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110'}`}
                                 title={readonly ? `Score: ${rating}/5` : `Rate ${star} Stars`}
                             >
-                                <Icon 
-                                    name="star" 
-                                    className={`w-5 h-5 ${star <= rating ? 'text-tempo-yellow' : 'text-zinc-300 dark:text-zinc-600'}`} 
-                                    filled={star <= rating}
-                                />
+                                <Icon name="star" className={`w-5 h-5 ${star <= rating ? 'text-tempo-yellow' : 'text-zinc-300 dark:text-zinc-600'}`} filled={star <= rating} />
                             </button>
                         ))}
                     </div>
@@ -226,17 +233,11 @@
             return (
                 <span>
                     {parts.map((part, i) => {
-                        if (part.startsWith('**') && part.endsWith('**')) {
-                            return <strong key={i} className="font-extrabold text-tempo-purple dark:text-tempo-yellow">{part.slice(2, -2)}</strong>;
-                        }
-                        if (part.startsWith('*') && part.endsWith('*')) {
-                            return <em key={i} className="italic text-tempo-purple dark:text-tempo-yellow">{part.slice(1, -1)}</em>;
-                        }
+                        if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} className="font-extrabold text-tempo-purple dark:text-tempo-yellow">{part.slice(2, -2)}</strong>;
+                        if (part.startsWith('*') && part.endsWith('*')) return <em key={i} className="italic text-tempo-purple dark:text-tempo-yellow">{part.slice(1, -1)}</em>;
                         if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
                             const match = part.match(/\[(.*?)\]\((.*?)\)/);
-                            if (match) {
-                                return <a key={i} href={match[2]} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 underline decoration-dotted underline-offset-4">{match[1]}</a>;
-                            }
+                            if (match) return <a key={i} href={match[2]} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 underline decoration-dotted underline-offset-4">{match[1]}</a>;
                         }
                         return part;
                     })}
@@ -250,34 +251,29 @@
 
             const insertFormat = (tag) => {
                 const textarea = textareaRef.current;
-                const start = textarea.selectionStart;
+                const start = textarea.selectionStart; 
                 const end = textarea.selectionEnd;
                 const text = textarea.value;
-                let newText;
-                let newCursorPos;
+                let newText, newCursorPos;
 
                 if (tag === 'link') {
-                    const url = prompt("Enter URL:");
+                    const url = prompt("Enter URL:"); // Uses browser prompt to avoid complex modal logic
                     if (!url) return;
                     const selected = text.slice(start, end) || "link";
                     const insert = `[${selected}](${url})`;
                     newText = text.slice(0, start) + insert + text.slice(end);
                     newCursorPos = start + insert.length;
-                } else if (tag.length === 1 || tag.length === 2) { 
+                } else if (tag.length <= 2) { // Emoji
                      newText = text.slice(0, start) + tag + text.slice(end);
                      newCursorPos = start + tag.length;
                 } else {
                     const wrapper = tag === 'bold' ? '**' : '*';
-                    const selectedText = text.slice(start, end);
-                    newText = text.slice(0, start) + wrapper + selectedText + wrapper + text.slice(end);
+                    newText = text.slice(0, start) + wrapper + text.slice(start, end) + wrapper + text.slice(end);
                     newCursorPos = end + (wrapper.length * 2);
                 }
 
                 onChange(newText);
-                setTimeout(() => {
-                    textarea.focus();
-                    textarea.setSelectionRange(newCursorPos, newCursorPos);
-                }, 0);
+                setTimeout(() => { textarea.focus(); textarea.setSelectionRange(newCursorPos, newCursorPos); }, 0);
             };
 
             return (
@@ -293,9 +289,7 @@
                                 <>
                                     <div className="fixed inset-0 z-10" onClick={() => setShowEmoji(false)}></div>
                                     <div className="absolute top-8 left-0 z-20 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl p-2 w-64 grid grid-cols-8 gap-1 max-h-48 overflow-y-auto">
-                                        {EMOJIS.map(emoji => (
-                                            <button key={emoji} type="button" onClick={() => { insertFormat(emoji); setShowEmoji(false); }} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-lg flex items-center justify-center">{emoji}</button>
-                                        ))}
+                                        {EMOJIS.map(e => <button key={e} type="button" onClick={() => { insertFormat(e); setShowEmoji(false); }} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-lg flex items-center justify-center">{e}</button>)}
                                     </div>
                                 </>
                             )}
@@ -321,27 +315,17 @@
                 setIsSubmitting(false);
             };
 
-            const startEdit = (index, text) => {
-                setEditingIndex(index);
-                setEditText(text);
-            };
-
             const saveEdit = async (index) => {
                 if (!editText.trim()) return;
                 await onEditComment(responseId, index, editText);
-                setEditingIndex(null);
-                setEditText('');
+                setEditingIndex(null); setEditText('');
             };
 
             return (
                 <div className="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                    <h4 className="text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400 mb-3 flex items-center gap-2">
-                        <Icon name="message-circle" className="w-3 h-3" /> Discussion
-                    </h4>
+                    <h4 className="text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400 mb-3 flex items-center gap-2"><Icon name="message-circle" className="w-3 h-3" /> Discussion</h4>
                     <div className="space-y-3 mb-4">
-                        {(!comments || comments.length === 0) && (
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400 italic">No questions or comments yet.</p>
-                        )}
+                        {(!comments || comments.length === 0) && <p className="text-xs text-zinc-500 dark:text-zinc-400 italic">No questions or comments yet.</p>}
                         {comments && comments.map((c, i) => (
                             <div key={i} className={`flex flex-col ${c.email === currentUser.email ? 'items-end' : 'items-start'}`}>
                                 {editingIndex === i ? (
@@ -358,7 +342,7 @@
                                             <span>{c.author}</span>
                                             {c.email === currentUser.email && (
                                                 <div className="flex gap-2 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => startEdit(i, c.text)} title="Edit" className="hover:text-tempo-orange"><Icon name="pencil" className="w-3 h-3" /></button>
+                                                    <button onClick={() => { setEditingIndex(i); setEditText(c.text); }} title="Edit" className="hover:text-tempo-orange"><Icon name="pencil" className="w-3 h-3" /></button>
                                                     <button onClick={() => onDeleteComment(responseId, i)} title="Delete" className="hover:text-tempo-red"><Icon name="trash-2" className="w-3 h-3" /></button>
                                                 </div>
                                             )}
@@ -371,59 +355,35 @@
                         ))}
                     </div>
                     <form onSubmit={handleSend} className="flex gap-2 items-end">
-                        <div className="flex-1">
-                            <RichTextEditor value={newComment} onChange={setNewComment} placeholder="Ask a question or reply..." />
-                        </div>
-                        <button type="submit" disabled={!newComment.trim() || isSubmitting} className="bg-tempo-purple text-white p-3 rounded-xl hover:opacity-90 disabled:opacity-50 transition-all h-[48px] flex items-center justify-center">
-                            <Icon name="send" className="w-4 h-4" />
-                        </button>
+                        <div className="flex-1"><RichTextEditor value={newComment} onChange={setNewComment} placeholder="Reply..." /></div>
+                        <button type="submit" disabled={!newComment.trim() || isSubmitting} className="bg-tempo-purple text-white p-3 rounded-xl hover:opacity-90 disabled:opacity-50 transition-all h-[48px] flex items-center justify-center"><Icon name="send" className="w-4 h-4" /></button>
                     </form>
                 </div>
             );
         };
 
-        const Header = ({ theme, toggleTheme, userRole, currentUser, onSignOut, notificationCount }) => {
+        const Header = ({ theme, toggleTheme, userRole, currentUser, onSignOut }) => {
             return (
                 <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-tempo-darkcard/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 shadow-sm transition-colors duration-300">
                     <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="bg-tempo-orange p-1.5 rounded-lg shadow-sm">
-                                <Icon name="shield" className="text-white w-6 h-6" />
-                            </div>
-                            <span className="font-bold text-xl tracking-tight text-tempo-purple dark:text-white">
-                                SOS <span className="text-tempo-orange">DAILY PRACTICE</span>
-                            </span>
+                            <div className="bg-tempo-orange p-1.5 rounded-lg shadow-sm"><Icon name="shield" className="text-white w-6 h-6" /></div>
+                            <span className="font-bold text-xl tracking-tight text-tempo-purple dark:text-white">SOS <span className="text-tempo-orange">DAILY PRACTICE</span></span>
                         </div>
                         <div className="flex items-center gap-4">
                              <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-400 transition-colors" title="Toggle Dark Mode">
                                 {theme === 'dark' ? <Icon name="sun" className="w-5 h-5" /> : <Icon name="moon" className="w-5 h-5" />}
                             </button>
-                            
-                            {/* NOTIFICATION BELL FOR AGENTS */}
-                            {userRole === 'agent' && (
-                                <div className="relative">
-                                    <div className="p-2 text-zinc-600 dark:text-zinc-300">
-                                        <Icon name="bell" className="w-5 h-5" />
-                                    </div>
-                                    {notificationCount > 0 && (
-                                        <span className="absolute top-0 right-0 bg-tempo-red text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shadow-sm">
-                                            {notificationCount}
-                                        </span>
-                                    )}
-                                </div>
-                            )}
-
                             {currentUser && (
                                 <div className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-700">
                                     <div className="flex flex-col items-end mr-1 hidden sm:flex">
                                         <span className="text-xs font-bold text-tempo-purple dark:text-zinc-300">{currentUser.displayName || 'Agent'}</span>
+                                        <span className="text-[10px] text-zinc-600 dark:text-zinc-400 uppercase tracking-wide">{userRole === 'admin' ? 'Admin' : 'Agent'}</span>
                                     </div>
                                     <div className="w-9 h-9 rounded-full bg-tempo-purple text-tempo-yellow flex items-center justify-center text-sm font-bold shadow-sm border-2 border-white dark:border-zinc-800" title={currentUser.email}>
                                         {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'A'}
                                     </div>
-                                    <button onClick={onSignOut} className="text-zinc-400 hover:text-tempo-red transition-colors" title="Sign Out">
-                                        <Icon name="log-out" className="w-5 h-5" />
-                                    </button>
+                                    <button onClick={onSignOut} className="text-zinc-400 hover:text-tempo-red transition-colors" title="Sign Out"><Icon name="log-out" className="w-5 h-5" /></button>
                                 </div>
                             )}
                         </div>
@@ -445,15 +405,12 @@
                 setError(null);
                 setLoading(true);
                 try {
-                    if (isSignUp) {
-                        await onSignUp(email, password, name);
-                    } else {
-                        await onSignIn(email, password);
-                    }
+                    if (isSignUp) { await onSignUp(email, password, name); } 
+                    else { await onSignIn(email, password); }
                 } catch (err) {
                     console.error(err);
                     let msg = err.message;
-                    if (err.code === 'auth/configuration-not-found') msg = "Setup Error: Enable 'Email/Password' in Firebase Console > Authentication.";
+                    if (err.code === 'auth/configuration-not-found') msg = "Setup Error: Please enable 'Email/Password' in Firebase Console.";
                     else if (err.code === 'auth/email-already-in-use') msg = "Email already registered.";
                     else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') msg = "Invalid email or password.";
                     else if (err.code === 'auth/weak-password') msg = "Password too short (min 6 chars).";
@@ -466,4 +423,271 @@
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-zinc-900 dark:to-black p-4 font-sans transition-colors duration-300 relative">
                     <div className="absolute top-4 right-4">
-                         <button onClick={toggleTheme} className="p-3 rounded-full bg-white dark:bg-zinc-800 shadow-md hover:bg-zinc-100 dark:hover:bg-zinc
+                         <button onClick={toggleTheme} className="p-3 rounded-full bg-white dark:bg-zinc-800 shadow-md hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 transition-colors">
+                            {theme === 'dark' ? <Icon name="sun" className="w-5 h-5" /> : <Icon name="moon" className="w-5 h-5" />}
+                        </button>
+                    </div>
+                    <div className="w-full max-w-md bg-white dark:bg-tempo-darkcard rounded-3xl shadow-xl border border-zinc-100 dark:border-zinc-800 p-10 fade-in">
+                        <div className="flex justify-center mb-8">
+                            <div className="w-20 h-20 bg-tempo-orange rounded-3xl flex items-center justify-center shadow-xl shadow-orange-200 dark:shadow-none transform -rotate-3"><Icon name="shield" className="text-white w-10 h-10" /></div>
+                        </div>
+                        <h2 className="text-3xl font-extrabold text-center mb-2 text-tempo-purple dark:text-white">{isSignUp ? 'Join the Team' : 'Welcome Back'}</h2>
+                        <p className="text-center text-zinc-700 dark:text-zinc-400 mb-8 font-medium">{isSignUp ? 'Create your agent profile.' : 'Sign in to access daily challenges.'}</p>
+                        <form onSubmit={handleSubmit} className="space-y-5">
+                            {isSignUp && (
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="user" className="w-5 h-5" /></div>
+                                    <input type="text" placeholder="Agent Name (e.g. AG101)" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-tempo-darkinput dark:text-white focus:bg-white dark:focus:bg-tempo-darkinput focus:border-tempo-orange focus:outline-none transition-all font-medium" value={name} onChange={e => setName(e.target.value)} required />
+                                </div>
+                            )}
+                            <div className="relative group">
+                                <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="mail" className="w-5 h-5" /></div>
+                                <input type="email" placeholder="Email Address" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-tempo-darkinput dark:text-white focus:bg-white dark:focus:bg-tempo-darkinput focus:border-tempo-orange focus:outline-none transition-all font-medium" value={email} onChange={e => setEmail(e.target.value)} required />
+                            </div>
+                            <div className="relative group">
+                                <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="lock" className="w-5 h-5" /></div>
+                                <input type="password" placeholder="Password" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-tempo-darkinput dark:text-white focus:bg-white dark:focus:bg-tempo-darkinput focus:border-tempo-orange focus:outline-none transition-all font-medium" value={password} onChange={e => setPassword(e.target.value)} required />
+                            </div>
+                            {error && <div className="p-4 text-sm bg-red-50 dark:bg-red-900/20 text-tempo-red dark:text-red-400 rounded-xl border-l-4 border-tempo-red flex items-start gap-3"><Icon name="alert-circle" className="w-5 h-5 min-w-[20px]" /><span className="font-medium">{error}</span></div>}
+                            <button type="submit" disabled={loading} className="w-full bg-tempo-purple text-white font-bold py-4 rounded-xl hover:opacity-90 hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-70 disabled:transform-none flex items-center justify-center gap-2 mt-4">{loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')} {!loading && <Icon name="arrow-right" className="w-5 h-5" />}</button>
+                        </form>
+                        <div className="mt-8 text-center">
+                            <button onClick={() => { setIsSignUp(!isSignUp); setError(null); }} className="text-sm text-zinc-700 dark:text-zinc-400 hover:text-tempo-orange font-semibold transition-colors">{isSignUp ? 'Already have an account? Sign In' : 'New agent? Create an account'}</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const AdminResponseView = ({ responses, promptId, onPostFeedback, onDeleteFeedback }) => {
+            const relevant = responses.filter(r => r.promptId === promptId);
+            if (relevant.length === 0) return <div className="p-4 text-sm text-zinc-600 dark:text-zinc-400 italic text-center">No agent responses yet.</div>;
+            
+            return (
+                <div className="mt-4 space-y-4">
+                    {relevant.map(r => (
+                        <div key={r.id} className="bg-white dark:bg-tempo-darkcard p-5 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-sm">
+                             <div className="flex justify-between mb-3 pb-3 border-b border-zinc-50 dark:border-zinc-800">
+                                <span className="font-bold text-sm flex items-center gap-2 text-tempo-purple dark:text-white">
+                                    <div className="w-6 h-6 rounded-full bg-tempo-gold/20 text-tempo-gold flex items-center justify-center text-xs"><Icon name="user" className="w-3 h-3" /></div>
+                                    {r.userName}
+                                </span>
+                                <span className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">{formatDate(r.timestamp)}</span>
+                             </div>
+                             <div className="text-sm text-zinc-900 dark:text-zinc-300 mb-4 leading-relaxed whitespace-pre-wrap"><MarkdownText text={r.responseContent} /></div>
+                             <FeedbackInput response={r} onPostFeedback={onPostFeedback} onDeleteFeedback={onDeleteFeedback} />
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        const AdminView = ({ prompts, responses, handleCreatePrompt, handleDeletePrompt, handleFeedback, handleDeleteFeedback, activeTab }) => {
+            const [expanded, setExpanded] = useState(null);
+            const filtered = prompts.filter(p => p.type === activeTab);
+            const mode = MODES[activeTab.toUpperCase()];
+
+            return (
+                <div className="space-y-8">
+                    <div className="bg-white dark:bg-tempo-darkcard p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-lg shadow-zinc-200/50 dark:shadow-none fade-in">
+                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-tempo-purple dark:text-white">
+                            <div className={`p-1.5 rounded-lg ${mode.bg} text-white`}><Icon name="plus" className="w-4 h-4" /></div> Create {mode.label}
+                        </h3>
+                        <form onSubmit={handleCreatePrompt}>
+                            <textarea name="content" className="w-full p-4 border-2 border-zinc-100 dark:border-zinc-700 rounded-xl mb-4 min-h-[120px] outline-none focus:border-tempo-blue focus:ring-0 transition-all bg-zinc-50 dark:bg-zinc-800 dark:text-white focus:bg-white dark:focus:bg-zinc-900 font-medium" placeholder={`Type ${activeTab.toUpperCase()} content here...`}></textarea>
+                            <div className="flex justify-end">
+                                <button className="bg-tempo-purple text-white px-8 py-2.5 rounded-xl font-bold hover:opacity-90 transition shadow-md hover:shadow-lg hover:-translate-y-0.5">Post Challenge</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div className="space-y-4 fade-in">
+                        <div className="flex items-center justify-between px-2">
+                            <h3 className="text-xs font-extrabold uppercase text-zinc-600 dark:text-zinc-400 tracking-widest">Active Prompts</h3>
+                            <span className="text-xs font-bold bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md text-zinc-700 dark:text-zinc-400">{filtered.length}</span>
+                        </div>
+                        {filtered.length === 0 && <div className="text-center py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl"><p className="text-zinc-600 dark:text-zinc-400 font-medium">No active prompts found.</p></div>}
+                        {filtered.map(p => {
+                            const promptResponses = responses.filter(r => r.promptId === p.id);
+                            const isOpen = expanded === p.id;
+                            return (
+                                <div key={p.id} className="bg-white dark:bg-tempo-darkcard rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                                    <div className={`p-5 cursor-pointer transition ${isOpen ? 'bg-zinc-50 dark:bg-zinc-800' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'}`} onClick={() => setExpanded(isOpen ? null : p.id)}>
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex-1 pr-4">
+                                                <p className="font-bold text-tempo-purple dark:text-white text-base">{p.content}</p>
+                                                <div className="mt-3 flex gap-4 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                                                    <span className="flex items-center gap-1.5"><Icon name="clock" className="w-3 h-3" /> {formatDate(p.createdAt)}</span>
+                                                    <span className={`flex items-center gap-1.5 ${promptResponses.length > 0 ? 'text-tempo-blue' : ''}`}><Icon name="users" className="w-3 h-3" /> {promptResponses.length} responses</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-3">
+                                                <button onClick={(e) => {e.stopPropagation(); handleDeletePrompt(p.id)}} className="text-zinc-300 hover:text-tempo-red p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Icon name="trash-2" className="w-4 h-4" /></button>
+                                                <div className={`bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 p-1.5 rounded-full transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}><Icon name="chevron-down" className="w-4 h-4 text-zinc-600 dark:text-zinc-400" /></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {isOpen && <div className="bg-zinc-50 dark:bg-zinc-800 p-6 border-t border-zinc-200 dark:border-zinc-700 space-y-6"><AdminResponseView responses={responses} promptId={p.id} onPostFeedback={handleFeedback} onDeleteFeedback={handleDeleteFeedback} /></div>}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        // --- MAIN APP LOGIC ---
+        const App = () => {
+            const [theme, setTheme] = useState('light');
+            const [user, setUser] = useState(null);
+            const [userRole, setUserRole] = useState('agent');
+            const [activeTab, setActiveTab] = useState('sms');
+            const [prompts, setPrompts] = useState([]);
+            const [responses, setResponses] = useState([]);
+            const [loadingAuth, setLoadingAuth] = useState(true);
+
+            const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
+            useEffect(() => {
+                if (theme === 'dark') document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            }, [theme]);
+
+            useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged((u) => {
+                    setUser(u);
+                    if(u && u.email && ADMIN_EMAILS.includes(u.email.toLowerCase())) {
+                        setUserRole('admin');
+                    } else {
+                        setUserRole('agent');
+                    }
+                    setLoadingAuth(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const unsubPrompts = db.collection('prompts').orderBy('createdAt', 'desc').onSnapshot(snap => {
+                    setPrompts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                });
+                const unsubResponses = db.collection('responses').orderBy('timestamp', 'desc').onSnapshot(snap => {
+                    setResponses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                });
+                return () => { unsubPrompts(); unsubResponses(); };
+            }, [user]);
+
+            const handleSignIn = (email, pass) => auth.signInWithEmailAndPassword(email, pass);
+            const handleSignUp = async (email, pass, name) => {
+                const cred = await auth.createUserWithEmailAndPassword(email, pass);
+                return cred.user.updateProfile({ displayName: name });
+            };
+            const handleSignOut = () => auth.signOut();
+
+            const handleCreatePrompt = async (e) => {
+                e.preventDefault();
+                const text = e.target.elements.content.value;
+                if(!text.trim()) return;
+                await db.collection('prompts').add({
+                    type: activeTab, content: text, 
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: user.uid
+                });
+                e.target.reset();
+            };
+            const handleDeletePrompt = (id) => db.collection('prompts').doc(id).delete();
+
+            const handleSubmitResponse = (pid, text) => {
+                db.collection('responses').add({
+                    promptId: pid, userId: user.uid, userName: user.displayName || 'Agent',
+                    userEmail: user.email, // Added for Zapier
+                    responseContent: text, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    adminFeedback: null, feedbackTimestamp: null, comments: []
+                });
+            };
+
+            const handleFeedback = (rid, text, score) => {
+                db.collection('responses').doc(rid).update({
+                    adminFeedback: text, score: score,
+                    feedbackTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    feedbackAuthor: user.email // Track who gave feedback
+                });
+            };
+            const handleDeleteFeedback = (rid) => db.collection('responses').doc(rid).update({ adminFeedback: null, feedbackTimestamp: null, score: 0, feedbackAuthor: null });
+
+            const handleAddComment = (rid, text) => {
+                db.collection('responses').doc(rid).update({
+                    comments: firebase.firestore.FieldValue.arrayUnion({
+                        text: text, author: user.displayName || user.email, email: user.email, timestamp: Date.now()
+                    })
+                });
+            };
+            const handleEditComment = (rid, index, newText) => {
+                const r = responses.find(r => r.id === rid); if(!r) return;
+                const updated = [...(r.comments || [])];
+                updated[index] = { ...updated[index], text: newText, edited: true };
+                db.collection('responses').doc(rid).update({ comments: updated });
+            }
+            const handleDeleteComment = (rid, index) => {
+                const r = responses.find(r => r.id === rid); if(!r) return;
+                const updated = (r.comments || []).filter((_, i) => i !== index);
+                db.collection('responses').doc(rid).update({ comments: updated });
+            }
+
+            if(loadingAuth) return <div className="min-h-screen flex items-center justify-center text-tempo-blue font-bold animate-pulse bg-zinc-50 dark:bg-zinc-950">Loading...</div>;
+            if (!user) return <LoginScreen onSignIn={handleSignIn} onSignUp={handleSignUp} theme={theme} toggleTheme={toggleTheme} />;
+
+            const myResponseIds = responses.filter(r => r.userId === user.uid).map(r => r.promptId);
+            const currentPrompts = prompts.filter(p => p.type === activeTab);
+            const activeChallenges = currentPrompts.filter(p => !myResponseIds.includes(p.id));
+            const myHistory = responses.filter(r => r.userId === user.uid && currentPrompts.find(p => p.id === r.promptId));
+            const getCount = (type) => prompts.filter(p => p.type === type && !myResponseIds.includes(p.id)).length;
+
+            return (
+                <div className="pb-20">
+                    <Header theme={theme} toggleTheme={toggleTheme} userRole={userRole} currentUser={user} onSignOut={handleSignOut} />
+                    <main className="max-w-4xl mx-auto px-4 py-8">
+                        <div className="flex bg-white dark:bg-zinc-900 p-1.5 rounded-2xl mb-10 shadow-sm border border-zinc-100 dark:border-zinc-800">
+                            {['sms', 'quiz'].map(t => {
+                                const count = getCount(t);
+                                const isActive = activeTab === t;
+                                const mode = MODES[t.toUpperCase()];
+                                return (
+                                    <button key={t} onClick={() => setActiveTab(t)} className={`flex-1 relative py-3 rounded-xl text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-300 ${isActive ? `${mode.bg} text-white shadow-md` : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}>
+                                        <Icon name={mode.iconName} className="w-4 h-4" /> {mode.label}
+                                        {userRole === 'agent' && count > 0 && <NotificationBadge count={count} modeBgClass={isActive ? 'bg-tempo-gold' : 'bg-tempo-red'} />}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                        {userRole === 'admin' ? (
+                            <AdminView 
+                                prompts={prompts} responses={responses} handleCreatePrompt={handleCreatePrompt} handleDeletePrompt={handleDeletePrompt} 
+                                handleFeedback={handleFeedback} handleDeleteFeedback={handleDeleteFeedback} handleAddComment={handleAddComment} 
+                                onEditComment={handleEditComment} onDeleteComment={handleDeleteComment} activeTab={activeTab} setActiveTab={setActiveTab} currentUser={user}
+                            />
+                        ) : (
+                            <div className="space-y-10 fade-in">
+                                <div className="space-y-5">
+                                    <div className="flex items-center justify-between px-1">
+                                        <h3 className="text-xs font-extrabold uppercase text-tempo-blue tracking-widest flex items-center gap-2">Active Challenges</h3>
+                                        <span className="bg-tempo-orange/10 text-tempo-orange px-2 py-0.5 rounded-md text-xs font-bold">{activeChallenges.length} New</span>
+                                    </div>
+                                    {activeChallenges.length === 0 && <div className="text-center py-16 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl bg-white dark:bg-zinc-900"><div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-3"><Icon name="check" className="text-green-600 dark:text-green-500 w-6 h-6" /></div><p className="text-zinc-800 dark:text-white font-bold">All caught up!</p></div>}
+                                    {activeChallenges.map(p => <ResponseCard key={p.id} prompt={p} mode={MODES[activeTab.toUpperCase()]} onSubmit={handleSubmitResponse} />)}
+                                </div>
+                                <div className="space-y-5 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+                                    <h3 className="text-xs font-extrabold uppercase text-tempo-blue tracking-widest px-1">My History</h3>
+                                    {myHistory.length === 0 && <div className="text-center py-8 text-zinc-600 dark:text-zinc-400 text-sm italic">No submissions yet.</div>}
+                                    {myHistory.map(r => <HistoryCard key={r.id} response={r} allPrompts={prompts} currentUser={user} onAddComment={handleAddComment} onEditComment={handleEditComment} onDeleteComment={handleDeleteComment} />)}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
