@@ -37,8 +37,8 @@
                             dark: '#1a1a1a',
                             light: '#f8f9fa',
                             // Dark mode specific palettes
-                            darkbg: '#09090b', // Very deep dark
-                            darkcard: '#18181b', // Slightly lighter for cards
+                            darkbg: '#09090b', 
+                            darkcard: '#18181b',
                             darkinput: '#27272a',
                         }
                     },
@@ -87,10 +87,25 @@
 
         /* Star Rating Fill Logic */
         .star-filled { fill: currentColor; }
+        
+        /* Error overlay */
+        #app-error { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; padding: 20px; color: red; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
+    <div id="app-error">
+        <h2 class="text-2xl font-bold mb-2">Something went wrong</h2>
+        <p id="error-message"></p>
+        <button onclick="window.location.reload()" class="mt-4 px-4 py-2 bg-gray-200 rounded text-black">Reload</button>
+    </div>
     <div id="root"></div>
+
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            document.getElementById('app-error').style.display = 'flex';
+            document.getElementById('error-message').innerText = message;
+        };
+    </script>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
@@ -315,6 +330,7 @@
             );
         };
 
+        // --- DEFINED BEFORE USE: CommentsSection ---
         const CommentsSection = ({ responseId, comments, onAddComment, onEditComment, onDeleteComment, currentUser }) => {
             const [newComment, setNewComment] = useState('');
             const [editingIndex, setEditingIndex] = useState(null);
@@ -380,6 +396,131 @@
                         <div className="flex-1"><RichTextEditor value={newComment} onChange={setNewComment} placeholder="Reply..." /></div>
                         <button type="submit" disabled={!newComment.trim() || isSubmitting} className="bg-tempo-purple text-white p-3 rounded-xl hover:opacity-90 disabled:opacity-50 transition-all h-[48px] flex items-center justify-center hover:scale-105 active:bg-green-600"><Icon name="send" className="w-4 h-4" /></button>
                     </form>
+                </div>
+            );
+        };
+
+        // --- DEFINED BEFORE USE: FeedbackInput ---
+        const FeedbackInput = ({ response, onPostFeedback, onDeleteFeedback }) => {
+            const [feedback, setFeedback] = useState(response.adminFeedback || '');
+            const [score, setScore] = useState(response.score || 0);
+            const [status, setStatus] = useState('idle');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if(!feedback.trim()) return;
+                setStatus('saving');
+                await onPostFeedback(response.id, feedback, score);
+                setStatus('success');
+                setTimeout(() => setStatus('idle'), 2000);
+            }
+
+            const handleDelete = async () => {
+                if(confirm("Are you sure you want to delete this feedback?")) {
+                    await onDeleteFeedback(response.id);
+                    setFeedback('');
+                    setScore(0);
+                }
+            }
+
+            return (
+                <form onSubmit={handleSubmit} className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-700">
+                    <div className="flex justify-between items-center mb-2">
+                        <label className="block text-xs font-bold uppercase text-tempo-blue flex items-center gap-2">
+                            <Icon name="pen-tool" className="w-3 h-3" /> Provide Coaching
+                        </label>
+                        <StarRating rating={score} onRate={setScore} />
+                    </div>
+                    
+                    <RichTextEditor value={feedback} onChange={setFeedback} placeholder="Write feedback here..." />
+
+                    <div className="flex justify-end mt-3 gap-2">
+                         {response.adminFeedback && (
+                            <button 
+                                type="button" 
+                                onClick={handleDelete}
+                                className="px-3 py-2 rounded-lg text-xs font-bold text-tempo-red hover:bg-red-50 dark:hover:bg-red-900/20 border border-transparent hover:border-tempo-red transition-all hover:scale-105 active:scale-95"
+                                title="Delete Feedback"
+                            >
+                                <Icon name="trash-2" className="w-4 h-4" />
+                            </button>
+                        )}
+                        <button type="submit" disabled={!feedback.trim() || status === 'saving'} 
+                            className={`px-5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95
+                            ${status === 'success' ? 'bg-green-500 text-white' : 'bg-tempo-purple text-white hover:bg-opacity-90 active:bg-green-600'}
+                            disabled:opacity-50 disabled:transform-none`}
+                        >
+                            {status === 'saving' && 'Saving...'}
+                            {status === 'success' && <><Icon name="check" className="w-3 h-3" /> Saved!</>}
+                            {status === 'idle' && 'Submit Feedback'}
+                        </button>
+                    </div>
+                </form>
+            )
+        }
+
+        // --- DEFINED BEFORE USE: AdminResponseCard ---
+        const AdminResponseCard = ({ response, onPostFeedback, onDeleteFeedback, onAddComment, onEditComment, onDeleteComment, currentUser }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const hasFeedback = !!response.adminFeedback;
+
+            return (
+                <div className="bg-white dark:bg-tempo-darkcard border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                    <div 
+                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                        onClick={() => setIsOpen(!isOpen)}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-tempo-gold/20 text-tempo-gold flex items-center justify-center text-xs font-bold">
+                                <Icon name="user" className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-bold text-zinc-800 dark:text-white">{response.userName}</span>
+                                <span className="text-[10px] text-zinc-400">{formatDate(response.timestamp)}</span>
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                            {hasFeedback ? (
+                                <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase flex items-center gap-1">
+                                    <Icon name="check" className="w-3 h-3" /> Reviewed
+                                </span>
+                            ) : (
+                                <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
+                                    Pending
+                                </span>
+                            )}
+                            <div className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                                <Icon name="chevron-down" className="w-4 h-4 text-zinc-400" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {isOpen && (
+                        <div className="p-5 border-t border-zinc-100 dark:border-zinc-700 bg-zinc-50/30 dark:bg-zinc-800/20">
+                            <div className="mb-4">
+                                <span className="text-[10px] font-bold uppercase text-zinc-400 block mb-1.5">Agent Response</span>
+                                <div className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                    <MarkdownText text={response.responseContent} />
+                                </div>
+                            </div>
+
+                            <FeedbackInput 
+                                response={response} 
+                                onPostFeedback={onPostFeedback} 
+                                onDeleteFeedback={onDeleteFeedback} 
+                            />
+                            
+                            <CommentsSection 
+                                responseId={response.id} 
+                                comments={response.comments} 
+                                onAddComment={onAddComment} 
+                                onEditComment={onEditComment} 
+                                onDeleteComment={onDeleteComment} 
+                                currentUser={currentUser} 
+                            />
+                        </div>
+                    )}
                 </div>
             );
         };
@@ -477,73 +618,6 @@
                             <button onClick={() => { setIsSignUp(!isSignUp); setError(null); }} className="text-sm text-zinc-700 dark:text-zinc-400 hover:text-tempo-orange font-semibold transition-colors">{isSignUp ? 'Already have an account? Sign In' : 'New agent? Create an account'}</button>
                         </div>
                     </div>
-                </div>
-            );
-        };
-
-        const AdminResponseCard = ({ response, onPostFeedback, onDeleteFeedback, onAddComment, onEditComment, onDeleteComment, currentUser }) => {
-            const [isOpen, setIsOpen] = useState(false);
-            const hasFeedback = !!response.adminFeedback;
-
-            return (
-                <div className="bg-white dark:bg-tempo-darkcard border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                    {/* Header / Toggle Area */}
-                    <div 
-                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-                        onClick={() => setIsOpen(!isOpen)}
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-tempo-gold/20 text-tempo-gold flex items-center justify-center text-xs font-bold">
-                                <Icon name="user" className="w-3.5 h-3.5" />
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-sm font-bold text-zinc-800 dark:text-white">{response.userName}</span>
-                                <span className="text-[10px] text-zinc-400">{formatDate(response.timestamp)}</span>
-                            </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-3">
-                            {hasFeedback ? (
-                                <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase flex items-center gap-1">
-                                    <Icon name="check" className="w-3 h-3" /> Reviewed
-                                </span>
-                            ) : (
-                                <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
-                                    Pending
-                                </span>
-                            )}
-                            <div className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
-                                <Icon name="chevron-down" className="w-4 h-4 text-zinc-400" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Expanded Content */}
-                    {isOpen && (
-                        <div className="p-5 border-t border-zinc-100 dark:border-zinc-700 bg-zinc-50/30 dark:bg-zinc-800/20">
-                            <div className="mb-4">
-                                <span className="text-[10px] font-bold uppercase text-zinc-400 block mb-1.5">Agent Response</span>
-                                <div className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                                    <MarkdownText text={response.responseContent} />
-                                </div>
-                            </div>
-
-                            <FeedbackInput 
-                                response={response} 
-                                onPostFeedback={onPostFeedback} 
-                                onDeleteFeedback={onDeleteFeedback} 
-                            />
-                            
-                            <CommentsSection 
-                                responseId={response.id} 
-                                comments={response.comments} 
-                                onAddComment={onAddComment} 
-                                onEditComment={onEditComment} 
-                                onDeleteComment={onDeleteComment} 
-                                currentUser={currentUser} 
-                            />
-                        </div>
-                    )}
                 </div>
             );
         };
