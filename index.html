@@ -41,6 +41,16 @@
                             darkcard: '#18181b',
                             darkinput: '#27272a',
                         }
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'float-delayed': 'float 6s ease-in-out 3s infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
                     }
                 }
             }
@@ -62,7 +72,7 @@
 
     <style>
         /* Base styles with dark mode support */
-        body { @apply bg-zinc-50 text-zinc-900 dark:bg-tempo-darkbg dark:text-white transition-colors duration-300; }
+        body { @apply bg-zinc-50 text-zinc-900 dark:bg-tempo-darkbg dark:text-white transition-colors duration-300; overflow-x: hidden; }
         
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -77,25 +87,10 @@
 
         /* Star Rating Fill Logic */
         .star-filled { fill: currentColor; }
-        
-        /* Error overlay */
-        #app-error { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; padding: 20px; color: red; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
-    <div id="app-error">
-        <h2 class="text-2xl font-bold mb-2">Something went wrong</h2>
-        <p id="error-message"></p>
-        <button onclick="window.location.reload()" class="mt-4 px-4 py-2 bg-gray-200 rounded text-black">Reload</button>
-    </div>
     <div id="root"></div>
-
-    <script>
-        window.onerror = function(message, source, lineno, colno, error) {
-            document.getElementById('app-error').style.display = 'flex';
-            document.getElementById('error-message').innerText = message;
-        };
-    </script>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
@@ -157,7 +152,6 @@
                    new Date(timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         };
 
-        // --- HELPER FOR RATING TEXT ---
         const getManagerName = (email) => {
             if (!email) return 'Manager';
             const lower = email.toLowerCase();
@@ -214,11 +208,18 @@
                     <div className="flex items-center gap-1">
                         {[1, 2, 3, 4, 5].map((star) => (
                             <button 
-                                key={star} type="button" disabled={readonly} onClick={() => !readonly && onRate(star)}
-                                className={`focus:outline-none transition-transform ${readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110'}`}
+                                key={star}
+                                type="button"
+                                disabled={readonly}
+                                onClick={() => !readonly && onRate(star)}
+                                className={`focus:outline-none transition-transform ${readonly ? 'cursor-default' : 'cursor-pointer hover:scale-125'}`}
                                 title={readonly ? `Score: ${rating}/5` : `Rate ${star} Stars`}
                             >
-                                <Icon name="star" className={`w-5 h-5 ${star <= rating ? 'text-tempo-yellow' : 'text-zinc-300 dark:text-zinc-600'}`} filled={star <= rating} />
+                                <Icon 
+                                    name="star" 
+                                    className={`w-5 h-5 ${star <= rating ? 'text-tempo-yellow' : 'text-zinc-300 dark:text-zinc-600'}`} 
+                                    filled={star <= rating}
+                                />
                             </button>
                         ))}
                     </div>
@@ -248,6 +249,16 @@
                 </span>
             );
         };
+
+        // --- FITNESS BACKGROUND COMPONENT ---
+        const FitnessBackground = () => (
+            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 opacity-[0.03] dark:opacity-[0.05]">
+                <div className="absolute top-20 left-[10%] animate-float"><Icon name="dumbbell" className="w-24 h-24 text-zinc-900 dark:text-white" /></div>
+                <div className="absolute bottom-32 right-[10%] animate-float-delayed"><Icon name="activity" className="w-32 h-32 text-tempo-orange" /></div>
+                <div className="absolute top-1/3 right-[20%] animate-float"><Icon name="zap" className="w-16 h-16 text-tempo-yellow" /></div>
+                <div className="absolute bottom-10 left-[20%] animate-float-delayed"><Icon name="heart" className="w-20 h-20 text-tempo-red" /></div>
+            </div>
+        );
 
         const RichTextEditor = ({ value, onChange, placeholder }) => {
             const textareaRef = useRef(null);
@@ -283,12 +294,12 @@
             return (
                 <div className="border border-zinc-300 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-tempo-darkinput focus-within:ring-2 focus-within:ring-tempo-blue transition-shadow relative">
                     <div className="flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 px-2 py-1.5">
-                        <button type="button" onClick={() => insertFormat('bold')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300 font-bold" title="Bold"><span className="font-serif">B</span></button>
-                        <button type="button" onClick={() => insertFormat('italic')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300 italic" title="Italic"><span className="font-serif">I</span></button>
-                         <button type="button" onClick={() => insertFormat('link')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300" title="Link"><Icon name="link" className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => insertFormat('bold')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300 font-bold active:bg-green-100 dark:active:bg-green-900/30 transition-colors" title="Bold"><span className="font-serif">B</span></button>
+                        <button type="button" onClick={() => insertFormat('italic')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300 italic active:bg-green-100 dark:active:bg-green-900/30 transition-colors" title="Italic"><span className="font-serif">I</span></button>
+                         <button type="button" onClick={() => insertFormat('link')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300 active:bg-green-100 dark:active:bg-green-900/30 transition-colors" title="Link"><Icon name="link" className="w-4 h-4" /></button>
                         <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-600 mx-1"></div>
                         <div className="relative">
-                            <button type="button" onClick={() => setShowEmoji(!showEmoji)} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300" title="Insert Emoji"><Icon name="smile" className="w-4 h-4" /></button>
+                            <button type="button" onClick={() => setShowEmoji(!showEmoji)} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300 active:bg-green-100 dark:active:bg-green-900/30 transition-colors" title="Insert Emoji"><Icon name="smile" className="w-4 h-4" /></button>
                             {showEmoji && (
                                 <>
                                     <div className="fixed inset-0 z-10" onClick={() => setShowEmoji(false)}></div>
@@ -332,7 +343,9 @@
 
             return (
                 <div className="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                    <h4 className="text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400 mb-3 flex items-center gap-2"><Icon name="message-circle" className="w-3 h-3" /> Discussion</h4>
+                    <h4 className="text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400 mb-3 flex items-center gap-2">
+                        <Icon name="message-circle" className="w-3 h-3" /> Discussion
+                    </h4>
                     <div className="space-y-3 mb-4">
                         {(!comments || comments.length === 0) && <p className="text-xs text-zinc-500 dark:text-zinc-400 italic">No questions or comments yet.</p>}
                         {comments && comments.map((c, i) => (
@@ -342,7 +355,7 @@
                                         <RichTextEditor value={editText} onChange={setEditText} />
                                         <div className="flex justify-end gap-2 mt-2">
                                             <button onClick={() => setEditingIndex(null)} className="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                                            <button onClick={() => saveEdit(i)} className="text-xs bg-tempo-purple text-white px-3 py-1 rounded-md">Save</button>
+                                            <button onClick={() => saveEdit(i)} className="text-xs bg-tempo-purple text-white px-3 py-1 rounded-md hover:scale-105 active:bg-green-600 transition-all">Save</button>
                                         </div>
                                     </div>
                                 ) : (
@@ -365,7 +378,7 @@
                     </div>
                     <form onSubmit={handleSend} className="flex gap-2 items-end">
                         <div className="flex-1"><RichTextEditor value={newComment} onChange={setNewComment} placeholder="Reply..." /></div>
-                        <button type="submit" disabled={!newComment.trim() || isSubmitting} className="bg-tempo-purple text-white p-3 rounded-xl hover:opacity-90 disabled:opacity-50 transition-all h-[48px] flex items-center justify-center"><Icon name="send" className="w-4 h-4" /></button>
+                        <button type="submit" disabled={!newComment.trim() || isSubmitting} className="bg-tempo-purple text-white p-3 rounded-xl hover:opacity-90 disabled:opacity-50 transition-all h-[48px] flex items-center justify-center hover:scale-105 active:bg-green-600"><Icon name="send" className="w-4 h-4" /></button>
                     </form>
                 </div>
             );
@@ -374,13 +387,13 @@
         const Header = ({ theme, toggleTheme, userRole, currentUser, onSignOut }) => {
             return (
                 <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-tempo-darkcard/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 shadow-sm transition-colors duration-300">
-                    <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+                    <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between relative z-10">
                         <div className="flex items-center gap-3">
                             <div className="bg-tempo-orange p-1.5 rounded-lg shadow-sm"><Icon name="shield" className="text-white w-6 h-6" /></div>
                             <span className="font-bold text-xl tracking-tight text-tempo-purple dark:text-white">SOS <span className="text-tempo-orange">DAILY PRACTICE</span></span>
                         </div>
                         <div className="flex items-center gap-4">
-                             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-400 transition-colors" title="Toggle Dark Mode">
+                             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-400 transition-all hover:scale-110 active:bg-green-100 dark:active:bg-green-900" title="Toggle Dark Mode">
                                 {theme === 'dark' ? <Icon name="sun" className="w-5 h-5" /> : <Icon name="moon" className="w-5 h-5" />}
                             </button>
                             {currentUser && (
@@ -392,7 +405,7 @@
                                     <div className="w-9 h-9 rounded-full bg-tempo-purple text-tempo-yellow flex items-center justify-center text-sm font-bold shadow-sm border-2 border-white dark:border-zinc-800" title={currentUser.email}>
                                         {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'A'}
                                     </div>
-                                    <button onClick={onSignOut} className="text-zinc-400 hover:text-tempo-red transition-colors" title="Sign Out"><Icon name="log-out" className="w-5 h-5" /></button>
+                                    <button onClick={onSignOut} className="text-zinc-400 hover:text-tempo-red transition-all hover:scale-110 active:text-red-600" title="Sign Out"><Icon name="log-out" className="w-5 h-5" /></button>
                                 </div>
                             )}
                         </div>
@@ -431,12 +444,12 @@
 
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-zinc-900 dark:to-black p-4 font-sans transition-colors duration-300 relative">
-                    <div className="absolute top-4 right-4">
-                         <button onClick={toggleTheme} className="p-3 rounded-full bg-white dark:bg-zinc-800 shadow-md hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 transition-colors">
+                    <div className="absolute top-4 right-4 z-20">
+                         <button onClick={toggleTheme} className="p-3 rounded-full bg-white dark:bg-zinc-800 shadow-md hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 transition-all hover:scale-110 active:bg-green-100">
                             {theme === 'dark' ? <Icon name="sun" className="w-5 h-5" /> : <Icon name="moon" className="w-5 h-5" />}
                         </button>
                     </div>
-                    <div className="w-full max-w-md bg-white dark:bg-tempo-darkcard rounded-3xl shadow-xl border border-zinc-100 dark:border-zinc-800 p-10 fade-in">
+                    <div className="w-full max-w-md bg-white dark:bg-tempo-darkcard rounded-3xl shadow-xl border border-zinc-100 dark:border-zinc-800 p-10 fade-in z-10 relative">
                         <div className="flex justify-center mb-8">
                             <div className="w-20 h-20 bg-tempo-orange rounded-3xl flex items-center justify-center shadow-xl shadow-orange-200 dark:shadow-none transform -rotate-3"><Icon name="shield" className="text-white w-10 h-10" /></div>
                         </div>
@@ -458,7 +471,7 @@
                                 <input type="password" placeholder="Password" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-tempo-darkinput dark:text-white focus:bg-white dark:focus:bg-tempo-darkinput focus:border-tempo-orange focus:outline-none transition-all font-medium" value={password} onChange={e => setPassword(e.target.value)} required />
                             </div>
                             {error && <div className="p-4 text-sm bg-red-50 dark:bg-red-900/20 text-tempo-red dark:text-red-400 rounded-xl border-l-4 border-tempo-red flex items-start gap-3"><Icon name="alert-circle" className="w-5 h-5 min-w-[20px]" /><span className="font-medium">{error}</span></div>}
-                            <button type="submit" disabled={loading} className="w-full bg-tempo-purple text-white font-bold py-4 rounded-xl hover:opacity-90 hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-70 disabled:transform-none flex items-center justify-center gap-2 mt-4">{loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')} {!loading && <Icon name="arrow-right" className="w-5 h-5" />}</button>
+                            <button type="submit" disabled={loading} className="w-full bg-tempo-purple text-white font-bold py-4 rounded-xl hover:opacity-90 hover:shadow-lg hover:-translate-y-0.5 transition-all active:bg-green-600 disabled:opacity-70 disabled:transform-none flex items-center justify-center gap-2 mt-4">{loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')} {!loading && <Icon name="arrow-right" className="w-5 h-5" />}</button>
                         </form>
                         <div className="mt-8 text-center">
                             <button onClick={() => { setIsSignUp(!isSignUp); setError(null); }} className="text-sm text-zinc-700 dark:text-zinc-400 hover:text-tempo-orange font-semibold transition-colors">{isSignUp ? 'Already have an account? Sign In' : 'New agent? Create an account'}</button>
@@ -506,16 +519,16 @@
                             <button 
                                 type="button" 
                                 onClick={handleDelete}
-                                className="px-3 py-2 rounded-lg text-xs font-bold text-tempo-red hover:bg-red-50 dark:hover:bg-red-900/20 border border-transparent hover:border-tempo-red transition-all"
+                                className="px-3 py-2 rounded-lg text-xs font-bold text-tempo-red hover:bg-red-50 dark:hover:bg-red-900/20 border border-transparent hover:border-tempo-red transition-all hover:scale-105 active:scale-95"
                                 title="Delete Feedback"
                             >
                                 <Icon name="trash-2" className="w-4 h-4" />
                             </button>
                         )}
                         <button type="submit" disabled={!feedback.trim() || status === 'saving'} 
-                            className={`px-5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all
-                            ${status === 'success' ? 'bg-green-500 text-white' : 'bg-tempo-purple text-white hover:bg-opacity-90'}
-                            disabled:opacity-50`}
+                            className={`px-5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95
+                            ${status === 'success' ? 'bg-green-500 text-white' : 'bg-tempo-purple text-white hover:bg-opacity-90 active:bg-green-600'}
+                            disabled:opacity-50 disabled:transform-none`}
                         >
                             {status === 'saving' && 'Saving...'}
                             {status === 'success' && <><Icon name="check" className="w-3 h-3" /> Saved!</>}
@@ -558,7 +571,7 @@
                     <div className="space-y-4">
                         <RichTextEditor value={text} onChange={setText} placeholder="Type your response here..." />
                         <div className="flex justify-end">
-                            <button onClick={handleSubmit} disabled={!text.trim() || submitting} className={`px-6 py-2.5 ${mode.bg} text-white rounded-xl font-bold text-sm hover:brightness-110 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:transform-none flex items-center gap-2 shadow-md`}>
+                            <button onClick={handleSubmit} disabled={!text.trim() || submitting} className={`px-6 py-2.5 ${mode.bg} text-white rounded-xl font-bold text-sm hover:brightness-110 hover:-translate-y-0.5 active:bg-green-600 active:translate-y-0 transition-all disabled:opacity-50 disabled:transform-none flex items-center gap-2 shadow-md`}>
                                 {submitting ? 'Sending...' : <>Submit Response <Icon name="send" className="w-4 h-4" /></>}
                             </button>
                         </div>
@@ -636,9 +649,9 @@
                              <CommentsSection 
                                 responseId={response.id} 
                                 comments={response.comments} 
-                                onAddComment={onAddComment}
-                                onEditComment={onEditComment}
-                                onDeleteComment={onDeleteComment}
+                                onAddComment={onAddComment} 
+                                onEditComment={onEditComment} 
+                                onDeleteComment={onDeleteComment} 
                                 currentUser={currentUser} 
                              />
                         </div>
@@ -662,7 +675,7 @@
                         <form onSubmit={handleCreatePrompt}>
                             <textarea name="content" className="w-full p-4 border-2 border-zinc-100 dark:border-zinc-700 rounded-xl mb-4 min-h-[120px] outline-none focus:border-tempo-blue focus:ring-0 transition-all bg-zinc-50 dark:bg-zinc-800 dark:text-white focus:bg-white dark:focus:bg-zinc-900 font-medium" placeholder={`Type ${activeTab.toUpperCase()} content here...`}></textarea>
                             <div className="flex justify-end">
-                                <button className="bg-tempo-purple text-white px-8 py-2.5 rounded-xl font-bold hover:opacity-90 transition shadow-md hover:shadow-lg hover:-translate-y-0.5">Post Challenge</button>
+                                <button className="bg-tempo-purple text-white px-8 py-2.5 rounded-xl font-bold hover:opacity-90 transition shadow-md hover:shadow-lg hover:-translate-y-0.5 active:bg-green-600">Post Challenge</button>
                             </div>
                         </form>
                     </div>
@@ -800,7 +813,7 @@
             const handleSubmitResponse = (pid, text) => {
                 db.collection('responses').add({
                     promptId: pid, userId: user.uid, userName: user.displayName || 'Agent',
-                    userEmail: user.email, // Added for Zapier
+                    userEmail: user.email, 
                     responseContent: text, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     adminFeedback: null, feedbackTimestamp: null, comments: []
                 });
@@ -845,8 +858,9 @@
 
             return (
                 <div className="pb-20">
+                    <FitnessBackground />
                     <Header theme={theme} toggleTheme={toggleTheme} userRole={userRole} currentUser={user} onSignOut={handleSignOut} />
-                    <main className="max-w-4xl mx-auto px-4 py-8">
+                    <main className="max-w-4xl mx-auto px-4 py-8 relative z-10">
                         <div className="flex bg-white dark:bg-zinc-900 p-1.5 rounded-2xl mb-10 shadow-sm border border-zinc-100 dark:border-zinc-800">
                             {['sms', 'quiz'].map(t => {
                                 const count = getCount(t);
@@ -873,7 +887,7 @@
                                         <h3 className="text-xs font-extrabold uppercase text-tempo-blue tracking-widest flex items-center gap-2">Active Challenges</h3>
                                         <span className="bg-tempo-orange/10 text-tempo-orange px-2 py-0.5 rounded-md text-xs font-bold">{activeChallenges.length} New</span>
                                     </div>
-                                    {activeChallenges.length === 0 && <div className="text-center py-16 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl bg-white dark:bg-zinc-900"><div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-3"><Icon name="check" className="text-green-600 dark:text-green-500 w-6 h-6" /></div><p className="text-zinc-800 dark:text-white font-bold">All caught up!</p></div>}
+                                    {activeChallenges.length === 0 && <div className="text-center py-16 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl bg-white dark:bg-zinc-900"><div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-3"><Icon name="check" className="text-green-600 dark:text-green-500 w-6 h-6" /></div><p className="text-zinc-900 dark:text-white font-bold">All caught up!</p><p className="text-zinc-600 dark:text-zinc-400 text-sm">Great job, no new challenges.</p></div>}
                                     {activeChallenges.map(p => <ResponseCard key={p.id} prompt={p} mode={MODES[activeTab.toUpperCase()]} onSubmit={handleSubmitResponse} />)}
                                 </div>
                                 <div className="space-y-5 pt-6 border-t border-zinc-200 dark:border-zinc-800">
