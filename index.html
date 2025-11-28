@@ -36,7 +36,6 @@
                             gold: '#c6a777',
                             dark: '#1a1a1a',
                             light: '#f8f9fa',
-                            // Dark mode specific palettes
                             darkbg: '#09090b', 
                             darkcard: '#18181b',
                             darkinput: '#27272a',
@@ -57,12 +56,12 @@
         }
     </script>
 
-    <!-- 3. React & ReactDOM & Babel -->
+    <!-- 3. React & Babel -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- 4. Lucide Icons -->
+    <!-- 4. Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- 5. Firebase -->
@@ -71,46 +70,32 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <style>
-        /* Base styles with dark mode support */
         body { @apply bg-zinc-50 text-zinc-900 dark:bg-tempo-darkbg dark:text-white transition-colors duration-300; overflow-x: hidden; }
-        
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #999; }
-        .dark ::-webkit-scrollbar-thumb { background: #444; }
-        .dark ::-webkit-scrollbar-thumb:hover { background: #555; }
-
-        /* Star Rating Fill Logic */
         .star-filled { fill: currentColor; }
-        
-        /* Error overlay */
-        #app-error { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; padding: 20px; color: red; flex-direction: column; align-items: center; justify-content: center; }
+        #app-error { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #18181b; color: #f46d6d; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; }
     </style>
 </head>
 <body>
     <div id="app-error">
-        <h2 class="text-2xl font-bold mb-2">Something went wrong</h2>
-        <p id="error-message"></p>
-        <button onclick="window.location.reload()" class="mt-4 px-4 py-2 bg-gray-200 rounded text-black">Reload</button>
+        <h2 class="text-2xl font-bold mb-2">Application Error</h2>
+        <p id="error-message" class="mb-4 font-mono text-sm opacity-80"></p>
+        <button onclick="window.location.reload()" class="px-4 py-2 bg-white text-black rounded font-bold">Reload</button>
     </div>
     <div id="root"></div>
 
     <script>
         window.onerror = function(message, source, lineno, colno, error) {
             document.getElementById('app-error').style.display = 'flex';
-            document.getElementById('error-message').innerText = message;
+            document.getElementById('error-message').innerText = message + " (Line " + lineno + ")";
         };
     </script>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // --- FIREBASE SETUP ---
+        // --- CONFIG ---
         const firebaseConfig = {
             apiKey: "AIzaSyDkXOuZGZ_vMQJPAIFe3ujRAoiN3BLFhoQ",
             authDomain: "os-daily-practice-data.firebaseapp.com",
@@ -121,13 +106,10 @@
             measurementId: "G-47TJTYBX20"
         };
 
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // --- UPDATED ADMIN LIST ---
         const ADMIN_EMAILS = [
             'ahmed.hamed@tempo.fit',
             'fatma.mohammad@tempo.fit',
@@ -135,36 +117,17 @@
             'khaledsabban@tempo.fit'
         ];
 
-        // --- EMOJI LIST ---
-        const EMOJIS = [
-            "👍", "👎", "❤️", "🔥", "✅", "❌", "🎉", "🤔", "👀", "💪", 
-            "👋", "🙌", "👏", "🤝", "🚀", "💡", "⭐", "🏆", "💯", "✨",
-            "😊", "😂", "😎", "😢", "😡", "🤯", "😱", "🤗", "🤫", "🫡",
-            "🏋️", "🧘", "🚴", "🤸", "🏃", "📞", "💻", "📱", "📧", "💬"
-        ];
+        const EMOJIS = ["👍","👎","❤️","🔥","✅","❌","🎉","🤔","👀","💪","👋","🙌","👏","🤝","🚀","💡","⭐","🏆","💯","✨","😊","😂","😎","😢","😡","🤯","😱","🤗","🤫","🫡","🏋️","🧘","🚴","🤸","🏃","📞","💻","📱","📧","💬"];
 
-        // --- CONSTANTS ---
         const MODES = {
-            SMS: { 
-                id: 'sms', label: 'Daily SMS', 
-                iconName: 'message-square', 
-                color: 'text-tempo-orange', bg: 'bg-tempo-orange', border: 'border-tempo-orange',
-                lightBg: 'bg-orange-50 dark:bg-orange-900/10',
-                persona: 'Coach Melissa' 
-            },
-            QUIZ: { 
-                id: 'quiz', label: 'Weekly Quiz', 
-                iconName: 'trophy', 
-                color: 'text-tempo-purple', bg: 'bg-tempo-purple', border: 'border-tempo-purple',
-                lightBg: 'bg-indigo-50 dark:bg-indigo-900/20',
-                persona: 'Sales Expert' 
-            }
+            SMS: { id: 'sms', label: 'Daily SMS', iconName: 'message-square', color: 'text-tempo-orange', bg: 'bg-tempo-orange', border: 'border-tempo-orange', lightBg: 'bg-orange-50 dark:bg-orange-900/10', persona: 'Coach Melissa' },
+            QUIZ: { id: 'quiz', label: 'Weekly Quiz', iconName: 'trophy', color: 'text-tempo-purple', bg: 'bg-tempo-purple', border: 'border-tempo-purple', lightBg: 'bg-indigo-50 dark:bg-indigo-900/20', persona: 'Sales Expert' }
         };
 
-        const formatDate = (timestamp) => {
-            if (!timestamp || !timestamp.seconds) return 'Just now';
-            return new Date(timestamp.seconds * 1000).toLocaleDateString() + ' ' + 
-                   new Date(timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        // --- UTILS ---
+        const formatDate = (ts) => {
+            if (!ts || !ts.seconds) return 'Just now';
+            return new Date(ts.seconds * 1000).toLocaleDateString() + ' ' + new Date(ts.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         };
 
         const getManagerName = (email) => {
@@ -179,8 +142,8 @@
 
         const getRatingLabel = (score) => {
             if (score === 5) return "Perfect Response!";
-            if (score === 3 || score === 4) return "Good Response!";
-            if (score === 1 || score === 2) return "You Can Do Better!";
+            if (score >= 3) return "Good Response!";
+            if (score >= 1) return "You Can Do Better!";
             return "";
         };
         
@@ -191,7 +154,7 @@
         }
 
         // --- COMPONENTS ---
-
+        
         const Icon = ({ name, className, filled }) => {
             const iconRef = useRef(null);
             useEffect(() => {
@@ -209,12 +172,8 @@
         };
 
         const NotificationBadge = ({ count, modeBgClass }) => {
-            if (count === 0) return null;
-            return (
-                <span className={`absolute -top-1 -right-2 ${modeBgClass} text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-sm border border-white dark:border-zinc-800`}>
-                    {count}
-                </span>
-            );
+            if (!count) return null;
+            return <span className={`absolute -top-1 -right-2 ${modeBgClass} text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-sm border border-white dark:border-zinc-800`}>{count}</span>;
         };
 
         const StarRating = ({ rating, onRate, readonly = false }) => {
@@ -222,27 +181,14 @@
                 <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1">
                         {[1, 2, 3, 4, 5].map((star) => (
-                            <button 
-                                key={star}
-                                type="button"
-                                disabled={readonly}
-                                onClick={() => !readonly && onRate(star)}
+                            <button key={star} type="button" disabled={readonly} onClick={() => !readonly && onRate(star)}
                                 className={`focus:outline-none transition-transform ${readonly ? 'cursor-default' : 'cursor-pointer hover:scale-125'}`}
-                                title={readonly ? `Score: ${rating}/5` : `Rate ${star} Stars`}
-                            >
-                                <Icon 
-                                    name="star" 
-                                    className={`w-5 h-5 ${star <= rating ? 'text-tempo-yellow' : 'text-zinc-300 dark:text-zinc-600'}`} 
-                                    filled={star <= rating}
-                                />
+                                title={readonly ? `Score: ${rating}/5` : `Rate ${star} Stars`}>
+                                <Icon name="star" className={`w-5 h-5 ${star <= rating ? 'text-tempo-yellow' : 'text-zinc-300 dark:text-zinc-600'}`} filled={star <= rating} />
                             </button>
                         ))}
                     </div>
-                    {rating > 0 && (
-                        <span className={`text-[10px] font-bold uppercase tracking-wider ${getRatingColorClass(rating)}`}>
-                            {getRatingLabel(rating)}
-                        </span>
-                    )}
+                    {rating > 0 && <span className={`text-[10px] font-bold uppercase tracking-wider ${getRatingColorClass(rating)}`}>{getRatingLabel(rating)}</span>}
                 </div>
             );
         };
@@ -265,25 +211,13 @@
             );
         };
 
-        // --- FITNESS BACKGROUND COMPONENT ---
-        const FitnessBackground = () => (
-            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 opacity-[0.03] dark:opacity-[0.05]">
-                <div className="absolute top-20 left-[10%] animate-float"><Icon name="dumbbell" className="w-24 h-24 text-zinc-900 dark:text-white" /></div>
-                <div className="absolute bottom-32 right-[10%] animate-float-delayed"><Icon name="activity" className="w-32 h-32 text-tempo-orange" /></div>
-                <div className="absolute top-1/3 right-[20%] animate-float"><Icon name="zap" className="w-16 h-16 text-tempo-yellow" /></div>
-                <div className="absolute bottom-10 left-[20%] animate-float-delayed"><Icon name="heart" className="w-20 h-20 text-tempo-red" /></div>
-            </div>
-        );
-
         const RichTextEditor = ({ value, onChange, placeholder }) => {
             const textareaRef = useRef(null);
             const [showEmoji, setShowEmoji] = useState(false);
 
             const insertFormat = (tag) => {
                 const textarea = textareaRef.current;
-                const start = textarea.selectionStart; 
-                const end = textarea.selectionEnd;
-                const text = textarea.value;
+                const start = textarea.selectionStart; const end = textarea.selectionEnd; const text = textarea.value;
                 let newText, newCursorPos;
 
                 if (tag === 'link') {
@@ -293,7 +227,7 @@
                     const insert = `[${selected}](${url})`;
                     newText = text.slice(0, start) + insert + text.slice(end);
                     newCursorPos = start + insert.length;
-                } else if (tag.length <= 2) { // Emoji
+                } else if (tag.length <= 2) { 
                      newText = text.slice(0, start) + tag + text.slice(end);
                      newCursorPos = start + tag.length;
                 } else {
@@ -301,7 +235,6 @@
                     newText = text.slice(0, start) + wrapper + text.slice(start, end) + wrapper + text.slice(end);
                     newCursorPos = end + (wrapper.length * 2);
                 }
-
                 onChange(newText);
                 setTimeout(() => { textarea.focus(); textarea.setSelectionRange(newCursorPos, newCursorPos); }, 0);
             };
@@ -309,12 +242,12 @@
             return (
                 <div className="border border-zinc-300 dark:border-zinc-700 rounded-xl overflow-hidden bg-white dark:bg-tempo-darkinput focus-within:ring-2 focus-within:ring-tempo-blue transition-shadow relative">
                     <div className="flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 px-2 py-1.5">
-                        <button type="button" onClick={() => insertFormat('bold')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300 font-bold active:bg-green-100 dark:active:bg-green-900/30 transition-colors" title="Bold"><span className="font-serif">B</span></button>
-                        <button type="button" onClick={() => insertFormat('italic')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300 italic active:bg-green-100 dark:active:bg-green-900/30 transition-colors" title="Italic"><span className="font-serif">I</span></button>
-                         <button type="button" onClick={() => insertFormat('link')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300 active:bg-green-100 dark:active:bg-green-900/30 transition-colors" title="Link"><Icon name="link" className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => insertFormat('bold')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300 font-bold" title="Bold"><span className="font-serif">B</span></button>
+                        <button type="button" onClick={() => insertFormat('italic')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300 italic" title="Italic"><span className="font-serif">I</span></button>
+                        <button type="button" onClick={() => insertFormat('link')} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300" title="Link"><Icon name="link" className="w-4 h-4" /></button>
                         <div className="w-px h-4 bg-zinc-300 dark:bg-zinc-600 mx-1"></div>
                         <div className="relative">
-                            <button type="button" onClick={() => setShowEmoji(!showEmoji)} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300 active:bg-green-100 dark:active:bg-green-900/30 transition-colors" title="Insert Emoji"><Icon name="smile" className="w-4 h-4" /></button>
+                            <button type="button" onClick={() => setShowEmoji(!showEmoji)} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-700 dark:text-zinc-300" title="Insert Emoji"><Icon name="smile" className="w-4 h-4" /></button>
                             {showEmoji && (
                                 <>
                                     <div className="fixed inset-0 z-10" onClick={() => setShowEmoji(false)}></div>
@@ -330,7 +263,6 @@
             );
         };
 
-        // --- DEFINED BEFORE USE: CommentsSection ---
         const CommentsSection = ({ responseId, comments, onAddComment, onEditComment, onDeleteComment, currentUser }) => {
             const [newComment, setNewComment] = useState('');
             const [editingIndex, setEditingIndex] = useState(null);
@@ -345,12 +277,7 @@
                 setNewComment('');
                 setIsSubmitting(false);
             };
-
-            const startEdit = (index, text) => {
-                setEditingIndex(index);
-                setEditText(text);
-            };
-
+            const startEdit = (index, text) => { setEditingIndex(index); setEditText(text); };
             const saveEdit = async (index) => {
                 if (!editText.trim()) return;
                 await onEditComment(responseId, index, editText);
@@ -359,9 +286,7 @@
 
             return (
                 <div className="mt-4 border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                    <h4 className="text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400 mb-3 flex items-center gap-2">
-                        <Icon name="message-circle" className="w-3 h-3" /> Discussion
-                    </h4>
+                    <h4 className="text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400 mb-3 flex items-center gap-2"><Icon name="message-circle" className="w-3 h-3" /> Discussion</h4>
                     <div className="space-y-3 mb-4">
                         {(!comments || comments.length === 0) && <p className="text-xs text-zinc-500 dark:text-zinc-400 italic">No questions or comments yet.</p>}
                         {comments && comments.map((c, i) => (
@@ -371,7 +296,7 @@
                                         <RichTextEditor value={editText} onChange={setEditText} />
                                         <div className="flex justify-end gap-2 mt-2">
                                             <button onClick={() => setEditingIndex(null)} className="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                                            <button onClick={() => saveEdit(i)} className="text-xs bg-tempo-purple text-white px-3 py-1 rounded-md hover:scale-105 active:bg-green-600 transition-all">Save</button>
+                                            <button onClick={() => saveEdit(i)} className="text-xs bg-tempo-purple text-white px-3 py-1 rounded-md">Save</button>
                                         </div>
                                     </div>
                                 ) : (
@@ -394,13 +319,12 @@
                     </div>
                     <form onSubmit={handleSend} className="flex gap-2 items-end">
                         <div className="flex-1"><RichTextEditor value={newComment} onChange={setNewComment} placeholder="Reply..." /></div>
-                        <button type="submit" disabled={!newComment.trim() || isSubmitting} className="bg-tempo-purple text-white p-3 rounded-xl hover:opacity-90 disabled:opacity-50 transition-all h-[48px] flex items-center justify-center hover:scale-105 active:bg-green-600"><Icon name="send" className="w-4 h-4" /></button>
+                        <button type="submit" disabled={!newComment.trim() || isSubmitting} className="bg-tempo-purple text-white p-3 rounded-xl hover:opacity-90 disabled:opacity-50 transition-all h-[48px] flex items-center justify-center"><Icon name="send" className="w-4 h-4" /></button>
                     </form>
                 </div>
             );
         };
 
-        // --- DEFINED BEFORE USE: FeedbackInput ---
         const FeedbackInput = ({ response, onPostFeedback, onDeleteFeedback }) => {
             const [feedback, setFeedback] = useState(response.adminFeedback || '');
             const [score, setScore] = useState(response.score || 0);
@@ -416,40 +340,22 @@
             }
 
             const handleDelete = async () => {
-                if(confirm("Are you sure you want to delete this feedback?")) {
+                if(confirm("Delete this feedback?")) {
                     await onDeleteFeedback(response.id);
-                    setFeedback('');
-                    setScore(0);
+                    setFeedback(''); setScore(0);
                 }
             }
 
             return (
                 <form onSubmit={handleSubmit} className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-700">
                     <div className="flex justify-between items-center mb-2">
-                        <label className="block text-xs font-bold uppercase text-tempo-blue flex items-center gap-2">
-                            <Icon name="pen-tool" className="w-3 h-3" /> Provide Coaching
-                        </label>
+                        <label className="block text-xs font-bold uppercase text-tempo-blue flex items-center gap-2"><Icon name="pen-tool" className="w-3 h-3" /> Provide Coaching</label>
                         <StarRating rating={score} onRate={setScore} />
                     </div>
-                    
-                    <RichTextEditor value={feedback} onChange={setFeedback} placeholder="Write feedback here..." />
-
+                    <RichTextEditor value={feedback} onChange={setFeedback} placeholder="Write feedback..." />
                     <div className="flex justify-end mt-3 gap-2">
-                         {response.adminFeedback && (
-                            <button 
-                                type="button" 
-                                onClick={handleDelete}
-                                className="px-3 py-2 rounded-lg text-xs font-bold text-tempo-red hover:bg-red-50 dark:hover:bg-red-900/20 border border-transparent hover:border-tempo-red transition-all hover:scale-105 active:scale-95"
-                                title="Delete Feedback"
-                            >
-                                <Icon name="trash-2" className="w-4 h-4" />
-                            </button>
-                        )}
-                        <button type="submit" disabled={!feedback.trim() || status === 'saving'} 
-                            className={`px-5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95
-                            ${status === 'success' ? 'bg-green-500 text-white' : 'bg-tempo-purple text-white hover:bg-opacity-90 active:bg-green-600'}
-                            disabled:opacity-50 disabled:transform-none`}
-                        >
+                         {response.adminFeedback && <button type="button" onClick={handleDelete} className="px-3 py-2 rounded-lg text-xs font-bold text-tempo-red hover:bg-red-50 dark:hover:bg-red-900/20 border border-transparent hover:border-tempo-red transition-all"><Icon name="trash-2" className="w-4 h-4" /></button>}
+                        <button type="submit" disabled={!feedback.trim() || status === 'saving'} className={`px-5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${status === 'success' ? 'bg-green-500 text-white' : 'bg-tempo-purple text-white hover:bg-opacity-90'} disabled:opacity-50`}>
                             {status === 'saving' && 'Saving...'}
                             {status === 'success' && <><Icon name="check" className="w-3 h-3" /> Saved!</>}
                             {status === 'idle' && 'Submit Feedback'}
@@ -459,237 +365,256 @@
             )
         }
 
-        // --- DEFINED BEFORE USE: AdminResponseCard ---
+        // --- REORDERED COMPONENTS TO FIX REFERENCE ERRORS ---
+        
+        const ResponseCard = ({ prompt, mode, onSubmit }) => {
+            const [text, setText] = useState('');
+            const [submitting, setSubmitting] = useState(false);
+
+            const handleSubmit = async () => {
+                if(text.trim()) {
+                    setSubmitting(true);
+                    await onSubmit(prompt.id, text);
+                    setSubmitting(false);
+                    setText('');
+                }
+            }
+            
+            // Attachment Renderer
+            const renderAttachment = () => {
+                if(!prompt.attachmentUrl) return null;
+                const isAudio = prompt.attachmentUrl.match(/\.(mp3|wav|m4a)$/i);
+                return (
+                    <div className="mt-4 mb-4 p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl">
+                        <p className="text-xs font-bold uppercase text-zinc-400 mb-2 flex items-center gap-1"><Icon name="paperclip" className="w-3 h-3" /> Attachment</p>
+                        {isAudio ? (
+                            <audio controls src={prompt.attachmentUrl} className="w-full h-8" />
+                        ) : (
+                            <a href={prompt.attachmentUrl} target="_blank" rel="noopener" className="text-sm text-tempo-blue hover:underline flex items-center gap-2">
+                                <Icon name="external-link" className="w-4 h-4" /> View Attached File
+                            </a>
+                        )}
+                    </div>
+                );
+            };
+
+            return (
+                <div className={`bg-white dark:bg-tempo-darkcard p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all fade-in border-l-4 ${mode.border}`}>
+                    <div className="flex justify-between items-start mb-4">
+                        <span className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 shadow-sm ${mode.bg}`}><Icon name={mode.iconName} className="w-3 h-3" /> {mode.label}</span>
+                        <span className="text-xs text-zinc-600 dark:text-zinc-400 flex items-center gap-1 font-medium"><Icon name="clock" className="w-3 h-3" /> {formatDate(prompt.createdAt)}</span>
+                    </div>
+                    
+                    <div className="text-sm text-zinc-800 dark:text-zinc-200 mb-4 leading-relaxed font-medium">
+                         <MarkdownText text={prompt.content} />
+                    </div>
+                    
+                    {renderAttachment()}
+                    
+                    <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                        <Icon name="user" className="w-3 h-3" /> Respond as: <span className={mode.color}>{mode.persona}</span>
+                    </div>
+                    <div className="space-y-4">
+                        <RichTextEditor value={text} onChange={setText} placeholder="Type your response here..." />
+                        <div className="flex justify-end">
+                            <button onClick={handleSubmit} disabled={!text.trim() || submitting} className={`px-6 py-2.5 ${mode.bg} text-white rounded-xl font-bold text-sm hover:brightness-110 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:transform-none flex items-center gap-2 shadow-md`}>
+                                {submitting ? 'Sending...' : <>Submit Response <Icon name="send" className="w-4 h-4" /></>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const HistoryCard = ({ response, allPrompts, currentUser, onAddComment, onEditComment, onDeleteComment }) => {
+            const [open, setOpen] = useState(false);
+            const prompt = allPrompts.find(p => p.id === response.promptId);
+            if(!prompt) return null;
+            const mode = prompt.type === 'sms' ? MODES.SMS : MODES.QUIZ;
+            const hasFeedback = !!response.adminFeedback;
+
+            return (
+                <div className="bg-white dark:bg-tempo-darkcard border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-center cursor-pointer" onClick={() => setOpen(!open)}>
+                        <div className="flex items-center gap-4">
+                            <div className={`w-3 h-3 rounded-full ${mode.bg}`}></div>
+                            <div className="flex flex-col">
+                                <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-0.5">Submitted {formatDate(response.timestamp)}</span>
+                                <div className="text-sm font-medium text-tempo-purple dark:text-white line-clamp-1 max-w-[200px] sm:max-w-md"><MarkdownText text={response.responseContent} /></div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                             {hasFeedback ? <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1.5 border border-green-200 dark:border-green-800"><Icon name="check-circle" className="w-3 h-3" /> Reviewed</span> : <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase border border-zinc-200 dark:border-zinc-700">Pending</span>}
+                             <div className={`bg-zinc-100 dark:bg-zinc-800 p-1.5 rounded-full transition-transform duration-300 ${open ? 'rotate-180' : ''}`}><Icon name="chevron-down" className="w-4 h-4 text-zinc-600 dark:text-zinc-400" /></div>
+                        </div>
+                    </div>
+                    {open && (
+                        <div className="mt-5 pt-5 border-t border-zinc-100 dark:border-zinc-800 space-y-5 fade-in">
+                             <div className={`${mode.lightBg} p-4 rounded-xl border border-zinc-200/50 dark:border-zinc-700/50`}>
+                                <span className={`text-[10px] font-bold uppercase ${mode.color} block mb-2 flex items-center gap-1`}><Icon name="help-circle" className="w-3 h-3" /> Inquiry</span>
+                                <div className="text-sm text-zinc-950 dark:text-zinc-200 font-medium"><MarkdownText text={prompt.content} /></div>
+                                {prompt.attachmentUrl && (
+                                     <div className="mt-2 text-xs">
+                                        {prompt.attachmentUrl.match(/\.(mp3|wav)$/i) ? <audio controls src={prompt.attachmentUrl} className="w-full h-6" /> : <a href={prompt.attachmentUrl} target="_blank" className="text-blue-500 underline">View Attachment</a>}
+                                     </div>
+                                )}
+                             </div>
+                             <div className="pl-2 border-l-2 border-zinc-200 dark:border-zinc-700">
+                                <span className="text-[10px] font-bold uppercase text-zinc-600 dark:text-zinc-400 block mb-2 ml-2">Your Answer</span>
+                                <div className="text-sm text-zinc-900 dark:text-zinc-300 whitespace-pre-wrap ml-2 leading-relaxed"><MarkdownText text={response.responseContent} /></div>
+                             </div>
+                             {hasFeedback ? (
+                                <div className="bg-white dark:bg-zinc-900 p-5 rounded-xl border-l-4 border-green-500 shadow-sm">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="text-[10px] font-bold uppercase text-green-600 block flex items-center gap-1.5"><Icon name="shield" className="w-3 h-3" /> {getManagerName(response.feedbackAuthor)} Feedback</span>
+                                        <StarRating rating={response.score || 0} readonly />
+                                    </div>
+                                    <div className="text-sm text-zinc-950 dark:text-zinc-200 leading-relaxed"><MarkdownText text={response.adminFeedback} /></div>
+                                </div>
+                             ) : <p className="text-xs text-zinc-600 dark:text-zinc-400 italic flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-lg"><Icon name="clock" className="w-3 h-3" /> Waiting for coach review...</p>}
+                             <CommentsSection responseId={response.id} comments={response.comments} onAddComment={onAddComment} onEditComment={onEditComment} onDeleteComment={onDeleteComment} currentUser={currentUser} />
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         const AdminResponseCard = ({ response, onPostFeedback, onDeleteFeedback, onAddComment, onEditComment, onDeleteComment, currentUser }) => {
             const [isOpen, setIsOpen] = useState(false);
             const hasFeedback = !!response.adminFeedback;
 
             return (
                 <div className="bg-white dark:bg-tempo-darkcard border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                    <div 
-                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-                        onClick={() => setIsOpen(!isOpen)}
-                    >
+                    <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors" onClick={() => setIsOpen(!isOpen)}>
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-tempo-gold/20 text-tempo-gold flex items-center justify-center text-xs font-bold">
-                                <Icon name="user" className="w-3.5 h-3.5" />
-                            </div>
+                            <div className="w-8 h-8 rounded-full bg-tempo-gold/20 text-tempo-gold flex items-center justify-center text-xs font-bold"><Icon name="user" className="w-3.5 h-3.5" /></div>
                             <div className="flex flex-col">
                                 <span className="text-sm font-bold text-zinc-800 dark:text-white">{response.userName}</span>
-                                <span className="text-[10px] text-zinc-400">{formatDate(response.timestamp)}</span>
+                                <span className="text-[10px] text-zinc-600 dark:text-zinc-400">{formatDate(response.timestamp)}</span>
                             </div>
                         </div>
-                        
                         <div className="flex items-center gap-3">
-                            {hasFeedback ? (
-                                <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase flex items-center gap-1">
-                                    <Icon name="check" className="w-3 h-3" /> Reviewed
-                                </span>
-                            ) : (
-                                <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
-                                    Pending
-                                </span>
-                            )}
-                            <div className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
-                                <Icon name="chevron-down" className="w-4 h-4 text-zinc-400" />
-                            </div>
+                            {hasFeedback ? <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase flex items-center gap-1"><Icon name="check" className="w-3 h-3" /> Reviewed</span> : <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">Pending</span>}
+                            <div className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}><Icon name="chevron-down" className="w-4 h-4 text-zinc-400" /></div>
                         </div>
                     </div>
-
                     {isOpen && (
                         <div className="p-5 border-t border-zinc-100 dark:border-zinc-700 bg-zinc-50/30 dark:bg-zinc-800/20">
                             <div className="mb-4">
-                                <span className="text-[10px] font-bold uppercase text-zinc-400 block mb-1.5">Agent Response</span>
-                                <div className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                                    <MarkdownText text={response.responseContent} />
-                                </div>
+                                <span className="text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400 block mb-1.5">Agent Response</span>
+                                <div className="text-sm text-zinc-900 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700"><MarkdownText text={response.responseContent} /></div>
                             </div>
-
-                            <FeedbackInput 
-                                response={response} 
-                                onPostFeedback={onPostFeedback} 
-                                onDeleteFeedback={onDeleteFeedback} 
-                            />
-                            
-                            <CommentsSection 
-                                responseId={response.id} 
-                                comments={response.comments} 
-                                onAddComment={onAddComment} 
-                                onEditComment={onEditComment} 
-                                onDeleteComment={onDeleteComment} 
-                                currentUser={currentUser} 
-                            />
+                            <FeedbackInput response={response} onPostFeedback={onPostFeedback} onDeleteFeedback={onDeleteFeedback} />
+                            <CommentsSection responseId={response.id} comments={response.comments} onAddComment={onAddComment} onEditComment={onEditComment} onDeleteComment={onDeleteComment} currentUser={currentUser} />
                         </div>
                     )}
                 </div>
             );
         };
 
-        const Header = ({ theme, toggleTheme, userRole, currentUser, onSignOut }) => {
-            return (
-                <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-tempo-darkcard/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 shadow-sm transition-colors duration-300">
-                    <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between relative z-10">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-tempo-orange p-1.5 rounded-lg shadow-sm"><Icon name="shield" className="text-white w-6 h-6" /></div>
-                            <span className="font-bold text-xl tracking-tight text-tempo-purple dark:text-white">SOS <span className="text-tempo-orange">DAILY PRACTICE</span></span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-400 transition-all hover:scale-110 active:bg-green-100 dark:active:bg-green-900" title="Toggle Dark Mode">
-                                {theme === 'dark' ? <Icon name="sun" className="w-5 h-5" /> : <Icon name="moon" className="w-5 h-5" />}
-                            </button>
-                            {currentUser && (
-                                <div className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-700">
-                                    <div className="flex flex-col items-end mr-1 hidden sm:flex">
-                                        <span className="text-xs font-bold text-tempo-purple dark:text-zinc-300">{currentUser.displayName || 'Agent'}</span>
-                                        <span className="text-[10px] text-zinc-600 dark:text-zinc-400 uppercase tracking-wide">{userRole === 'admin' ? 'Admin' : 'Agent'}</span>
-                                    </div>
-                                    <div className="w-9 h-9 rounded-full bg-tempo-purple text-tempo-yellow flex items-center justify-center text-sm font-bold shadow-sm border-2 border-white dark:border-zinc-800" title={currentUser.email}>
-                                        {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'A'}
-                                    </div>
-                                    <button onClick={onSignOut} className="text-zinc-400 hover:text-tempo-red transition-all hover:scale-110 active:text-red-600" title="Sign Out"><Icon name="log-out" className="w-5 h-5" /></button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </header>
-            );
-        };
-
-        const LoginScreen = ({ onSignIn, onSignUp, theme, toggleTheme }) => {
-            const [isSignUp, setIsSignUp] = useState(false);
-            const [email, setEmail] = useState('');
-            const [password, setPassword] = useState('');
-            const [name, setName] = useState('');
-            const [loading, setLoading] = useState(false);
-            const [error, setError] = useState(null);
-
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                setError(null);
-                setLoading(true);
-                try {
-                    if (isSignUp) { await onSignUp(email, password, name); } 
-                    else { await onSignIn(email, password); }
-                } catch (err) {
-                    console.error(err);
-                    let msg = err.message;
-                    if (err.code === 'auth/configuration-not-found') msg = "Setup Error: Please enable 'Email/Password' in Firebase Console.";
-                    else if (err.code === 'auth/email-already-in-use') msg = "Email already registered.";
-                    else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') msg = "Invalid email or password.";
-                    else if (err.code === 'auth/weak-password') msg = "Password too short (min 6 chars).";
-                    setError(msg);
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            return (
-                <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-zinc-900 dark:to-black p-4 font-sans transition-colors duration-300 relative">
-                    <div className="absolute top-4 right-4 z-20">
-                         <button onClick={toggleTheme} className="p-3 rounded-full bg-white dark:bg-zinc-800 shadow-md hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 transition-all hover:scale-110 active:bg-green-100">
-                            {theme === 'dark' ? <Icon name="sun" className="w-5 h-5" /> : <Icon name="moon" className="w-5 h-5" />}
-                        </button>
-                    </div>
-                    <div className="w-full max-w-md bg-white dark:bg-tempo-darkcard rounded-3xl shadow-xl border border-zinc-100 dark:border-zinc-800 p-10 fade-in z-10 relative">
-                        <div className="flex justify-center mb-8">
-                            <div className="w-20 h-20 bg-tempo-orange rounded-3xl flex items-center justify-center shadow-xl shadow-orange-200 dark:shadow-none transform -rotate-3"><Icon name="shield" className="text-white w-10 h-10" /></div>
-                        </div>
-                        <h2 className="text-3xl font-extrabold text-center mb-2 text-tempo-purple dark:text-white">{isSignUp ? 'Join the Team' : 'Welcome Back'}</h2>
-                        <p className="text-center text-zinc-700 dark:text-zinc-400 mb-8 font-medium">{isSignUp ? 'Create your agent profile.' : 'Sign in to access daily challenges.'}</p>
-                        <form onSubmit={handleSubmit} className="space-y-5">
-                            {isSignUp && (
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="user" className="w-5 h-5" /></div>
-                                    <input type="text" placeholder="Agent Name (e.g. AG101)" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-tempo-darkinput dark:text-white focus:bg-white dark:focus:bg-tempo-darkinput focus:border-tempo-orange focus:outline-none transition-all font-medium" value={name} onChange={e => setName(e.target.value)} required />
-                                </div>
-                            )}
-                            <div className="relative group">
-                                <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="mail" className="w-5 h-5" /></div>
-                                <input type="email" placeholder="Email Address" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-tempo-darkinput dark:text-white focus:bg-white dark:focus:bg-tempo-darkinput focus:border-tempo-orange focus:outline-none transition-all font-medium" value={email} onChange={e => setEmail(e.target.value)} required />
-                            </div>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-3.5 text-zinc-400 group-focus-within:text-tempo-orange transition-colors"><Icon name="lock" className="w-5 h-5" /></div>
-                                <input type="password" placeholder="Password" className="w-full pl-12 p-3.5 rounded-xl border-2 border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-tempo-darkinput dark:text-white focus:bg-white dark:focus:bg-tempo-darkinput focus:border-tempo-orange focus:outline-none transition-all font-medium" value={password} onChange={e => setPassword(e.target.value)} required />
-                            </div>
-                            {error && <div className="p-4 text-sm bg-red-50 dark:bg-red-900/20 text-tempo-red dark:text-red-400 rounded-xl border-l-4 border-tempo-red flex items-start gap-3"><Icon name="alert-circle" className="w-5 h-5 min-w-[20px]" /><span className="font-medium">{error}</span></div>}
-                            <button type="submit" disabled={loading} className="w-full bg-tempo-purple text-white font-bold py-4 rounded-xl hover:opacity-90 hover:shadow-lg hover:-translate-y-0.5 transition-all active:bg-green-600 disabled:opacity-70 disabled:transform-none flex items-center justify-center gap-2 mt-4">{loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')} {!loading && <Icon name="arrow-right" className="w-5 h-5" />}</button>
-                        </form>
-                        <div className="mt-8 text-center">
-                            <button onClick={() => { setIsSignUp(!isSignUp); setError(null); }} className="text-sm text-zinc-700 dark:text-zinc-400 hover:text-tempo-orange font-semibold transition-colors">{isSignUp ? 'Already have an account? Sign In' : 'New agent? Create an account'}</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const AdminView = ({ prompts, responses, handleCreatePrompt, handleDeletePrompt, handleFeedback, handleDeleteFeedback, handleAddComment, onEditComment, onDeleteComment, activeTab, setActiveTab, currentUser }) => {
+        const AdminView = ({ prompts, responses, handleCreatePrompt, handleDeletePrompt, handleFeedback, handleDeleteFeedback, handleAddComment, onEditComment, onDeleteComment, activeTab, setActiveTab, currentUser, users }) => {
             const [expanded, setExpanded] = useState(null);
+            const [newContent, setNewContent] = useState('');
+            const [attachmentUrl, setAttachmentUrl] = useState('');
+            const [assignTo, setAssignTo] = useState([]); // Array of emails
+            const [showAgentSelector, setShowAgentSelector] = useState(false);
+            
             const filtered = prompts.filter(p => p.type === activeTab);
             const mode = MODES[activeTab.toUpperCase()];
+
+            const handleCreate = (e) => {
+                e.preventDefault();
+                if(!newContent.trim()) return;
+                handleCreatePrompt(newContent, attachmentUrl, assignTo.length > 0 ? assignTo : null); // Null means all
+                setNewContent(''); setAttachmentUrl(''); setAssignTo([]);
+            };
+            
+            const toggleAgent = (email) => {
+                if(assignTo.includes(email)) setAssignTo(assignTo.filter(e => e !== email));
+                else setAssignTo([...assignTo, email]);
+            };
 
             return (
                 <div className="space-y-8">
                     <div className="bg-white dark:bg-tempo-darkcard p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-lg shadow-zinc-200/50 dark:shadow-none fade-in">
                         <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-tempo-purple dark:text-white">
-                            <div className={`p-1.5 rounded-lg ${mode.bg} text-white`}><Icon name="plus" className="w-4 h-4" /></div> 
-                            Create {mode.label}
+                            <div className={`p-1.5 rounded-lg ${mode.bg} text-white`}><Icon name="plus" className="w-4 h-4" /></div> Create {mode.label}
                         </h3>
-                        <form onSubmit={handleCreatePrompt}>
-                            <textarea name="content" className="w-full p-4 border-2 border-zinc-100 dark:border-zinc-700 rounded-xl mb-4 min-h-[120px] outline-none focus:border-tempo-blue focus:ring-0 transition-all bg-zinc-50 dark:bg-zinc-800 dark:text-white focus:bg-white dark:focus:bg-zinc-900 font-medium" placeholder={`Type ${activeTab.toUpperCase()} content here...`}></textarea>
+                        <form onSubmit={handleCreate}>
+                            <div className="mb-4">
+                                <RichTextEditor value={newContent} onChange={setNewContent} placeholder={`Type ${activeTab.toUpperCase()} content here...`} />
+                            </div>
+                            
+                            {/* Attachments & Assignments */}
+                            <div className="flex flex-wrap gap-3 mb-4">
+                                <div className="flex-1 min-w-[200px]">
+                                    <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-1">Attachment URL (Audio/File)</label>
+                                    <input type="text" value={attachmentUrl} onChange={e => setAttachmentUrl(e.target.value)} placeholder="https://..." className="w-full p-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-tempo-darkinput text-zinc-900 dark:text-white focus:ring-1 focus:ring-tempo-purple outline-none" />
+                                </div>
+                                
+                                <div className="flex-1 min-w-[200px] relative">
+                                    <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-1">Assign To</label>
+                                    <button type="button" onClick={() => setShowAgentSelector(!showAgentSelector)} className="w-full p-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-tempo-darkinput text-left flex justify-between items-center">
+                                        <span className="truncate text-zinc-700 dark:text-zinc-300">{assignTo.length === 0 ? 'All Agents' : `${assignTo.length} Selected`}</span>
+                                        <Icon name="chevron-down" className="w-4 h-4" />
+                                    </button>
+                                    
+                                    {showAgentSelector && (
+                                        <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-20 max-h-48 overflow-y-auto p-2">
+                                            <button type="button" onClick={() => setAssignTo([])} className={`w-full text-left px-2 py-1.5 rounded text-sm ${assignTo.length === 0 ? 'bg-tempo-purple text-white' : 'hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300'}`}>All Agents</button>
+                                            {users.map(u => (
+                                                <button key={u.email} type="button" onClick={() => toggleAgent(u.email)} className={`w-full text-left px-2 py-1.5 rounded text-sm mt-1 flex justify-between items-center ${assignTo.includes(u.email) ? 'bg-purple-100 dark:bg-purple-900/30 text-tempo-purple dark:text-white' : 'hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300'}`}>
+                                                    {u.displayName || u.email}
+                                                    {assignTo.includes(u.email) && <Icon name="check" className="w-3 h-3" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {showAgentSelector && <div className="fixed inset-0 z-10" onClick={() => setShowAgentSelector(false)}></div>}
+                                </div>
+                            </div>
+
                             <div className="flex justify-end">
                                 <button className="bg-tempo-purple text-white px-8 py-2.5 rounded-xl font-bold hover:opacity-90 transition shadow-md hover:shadow-lg hover:-translate-y-0.5 active:bg-green-600">Post Challenge</button>
                             </div>
                         </form>
                     </div>
 
+                    {/* Prompt List */}
                     <div className="space-y-4 fade-in">
                         <div className="flex items-center justify-between px-2">
                             <h3 className="text-xs font-extrabold uppercase text-zinc-600 dark:text-zinc-400 tracking-widest">Active Prompts</h3>
                             <span className="text-xs font-bold bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md text-zinc-700 dark:text-zinc-400">{filtered.length}</span>
                         </div>
-                        
-                        {filtered.length === 0 && (
-                            <div className="text-center py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl">
-                                <p className="text-zinc-600 dark:text-zinc-400 font-medium">No active prompts found.</p>
-                            </div>
-                        )}
-
+                        {filtered.length === 0 && <div className="text-center py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl"><p className="text-zinc-600 dark:text-zinc-400 font-medium">No active prompts.</p></div>}
                         {filtered.map(p => {
                             const promptResponses = responses.filter(r => r.promptId === p.id);
                             const isOpen = expanded === p.id;
-                            
                             return (
                                 <div key={p.id} className="bg-white dark:bg-tempo-darkcard rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-md transition-all">
                                     <div className={`p-5 cursor-pointer transition ${isOpen ? 'bg-zinc-50 dark:bg-zinc-800' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'}`} onClick={() => setExpanded(isOpen ? null : p.id)}>
                                         <div className="flex justify-between items-start">
                                             <div className="flex-1 pr-4">
-                                                <p className="font-bold text-tempo-purple dark:text-white text-base">{p.content}</p>
+                                                <div className="font-bold text-tempo-purple dark:text-white text-base"><MarkdownText text={p.content} /></div>
                                                 <div className="mt-3 flex gap-4 text-xs font-medium text-zinc-600 dark:text-zinc-400">
                                                     <span className="flex items-center gap-1.5"><Icon name="clock" className="w-3 h-3" /> {formatDate(p.createdAt)}</span>
                                                     <span className={`flex items-center gap-1.5 ${promptResponses.length > 0 ? 'text-tempo-blue' : ''}`}><Icon name="users" className="w-3 h-3" /> {promptResponses.length} responses</span>
+                                                    {p.assignedTo && <span className="flex items-center gap-1.5 text-tempo-orange"><Icon name="lock" className="w-3 h-3" /> Limited Access</span>}
                                                 </div>
                                             </div>
                                             <div className="flex flex-col items-end gap-3">
                                                 <button onClick={(e) => {e.stopPropagation(); handleDeletePrompt(p.id)}} className="text-zinc-300 hover:text-tempo-red p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Icon name="trash-2" className="w-4 h-4" /></button>
-                                                <div className={`bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 p-1.5 rounded-full transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
-                                                    <Icon name="chevron-down" className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
-                                                </div>
+                                                <Icon name="chevron-down" className={`w-4 h-4 text-zinc-600 dark:text-zinc-400 transition ${isOpen ? 'rotate-180' : ''}`} />
                                             </div>
                                         </div>
                                     </div>
                                     {isOpen && (
                                         <div className="bg-zinc-50 dark:bg-zinc-800 p-6 border-t border-zinc-200 dark:border-zinc-700 space-y-4">
-                                            {promptResponses.length === 0 && <div className="text-center py-4 text-sm text-zinc-600 dark:text-zinc-400 italic bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-700">No agent responses yet.</div>}
+                                            {promptResponses.length === 0 && <div className="text-center py-4 text-sm text-zinc-600 dark:text-zinc-400 italic">No responses yet.</div>}
                                             {promptResponses.map(r => (
                                                 <AdminResponseCard 
-                                                    key={r.id}
-                                                    response={r}
-                                                    onPostFeedback={handleFeedback}
-                                                    onDeleteFeedback={handleDeleteFeedback}
-                                                    onAddComment={handleAddComment}
-                                                    onEditComment={onEditComment}
-                                                    onDeleteComment={onDeleteComment}
-                                                    currentUser={currentUser}
+                                                    key={r.id} response={r} onPostFeedback={handleFeedback} onDeleteFeedback={handleDeleteFeedback}
+                                                    onAddComment={handleAddComment} onEditComment={onEditComment} onDeleteComment={onDeleteComment} currentUser={currentUser}
                                                 />
                                             ))}
                                         </div>
@@ -702,6 +627,36 @@
             );
         }
 
+        const Header = ({ theme, toggleTheme, userRole, currentUser, onSignOut }) => {
+            return (
+                <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-tempo-darkcard/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 shadow-sm transition-colors duration-300">
+                    <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between relative z-10">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-tempo-orange p-1.5 rounded-lg shadow-sm"><Icon name="shield" className="text-white w-6 h-6" /></div>
+                            <span className="font-bold text-xl tracking-tight text-tempo-purple dark:text-white">SOS <span className="text-tempo-orange">DAILY PRACTICE</span></span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-400 transition-colors" title="Toggle Dark Mode">
+                                {theme === 'dark' ? <Icon name="sun" className="w-5 h-5" /> : <Icon name="moon" className="w-5 h-5" />}
+                            </button>
+                            {currentUser && (
+                                <div className="flex items-center gap-3 pl-4 border-l border-zinc-200 dark:border-zinc-700">
+                                    <div className="flex flex-col items-end mr-1 hidden sm:flex">
+                                        <span className="text-xs font-bold text-tempo-purple dark:text-zinc-300">{currentUser.displayName || 'Agent'}</span>
+                                        <span className="text-[10px] text-zinc-600 dark:text-zinc-400 uppercase tracking-wide">{userRole === 'admin' ? 'Admin' : 'Agent'}</span>
+                                    </div>
+                                    <div className="w-9 h-9 rounded-full bg-tempo-purple text-tempo-yellow flex items-center justify-center text-sm font-bold shadow-sm border-2 border-white dark:border-zinc-800" title={currentUser.email}>
+                                        {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'A'}
+                                    </div>
+                                    <button onClick={onSignOut} className="text-zinc-400 hover:text-tempo-red transition-colors" title="Sign Out"><Icon name="log-out" className="w-5 h-5" /></button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </header>
+            );
+        };
+
         // --- MAIN APP LOGIC ---
         const App = () => {
             const [theme, setTheme] = useState('light');
@@ -710,36 +665,43 @@
             const [activeTab, setActiveTab] = useState('sms');
             const [prompts, setPrompts] = useState([]);
             const [responses, setResponses] = useState([]);
+            const [users, setUsers] = useState([]); // For Agent Selector
             const [loadingAuth, setLoadingAuth] = useState(true);
 
             const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
-            useEffect(() => {
-                if (theme === 'dark') document.documentElement.classList.add('dark');
-                else document.documentElement.classList.remove('dark');
-            }, [theme]);
+            useEffect(() => { if (theme === 'dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); }, [theme]);
 
+            // Auth & User Profile Sync
             useEffect(() => {
-                const unsubscribe = auth.onAuthStateChanged((u) => {
-                    setUser(u);
-                    if(u && u.email && ADMIN_EMAILS.includes(u.email.toLowerCase())) {
-                        setUserRole('admin');
-                    } else {
-                        setUserRole('agent');
+                const unsubscribe = auth.onAuthStateChanged(async (u) => {
+                    if(u) {
+                        // Save/Update User Profile on Login
+                        await db.collection('users').doc(u.uid).set({
+                            email: u.email,
+                            displayName: u.displayName,
+                            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
+
+                        if(ADMIN_EMAILS.includes(u.email.toLowerCase())) setUserRole('admin');
+                        else setUserRole('agent');
                     }
+                    setUser(u);
                     setLoadingAuth(false);
                 });
                 return () => unsubscribe();
             }, []);
 
+            // Data Observers
             useEffect(() => {
                 if (!user) return;
-                const unsubPrompts = db.collection('prompts').orderBy('createdAt', 'desc').onSnapshot(snap => {
-                    setPrompts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                });
-                const unsubResponses = db.collection('responses').orderBy('timestamp', 'desc').onSnapshot(snap => {
-                    setResponses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                });
-                return () => { unsubPrompts(); unsubResponses(); };
+                const unsubPrompts = db.collection('prompts').orderBy('createdAt', 'desc').onSnapshot(snap => setPrompts(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                const unsubResponses = db.collection('responses').orderBy('timestamp', 'desc').onSnapshot(snap => setResponses(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                // Fetch Users for Admin
+                let unsubUsers = () => {};
+                if (ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+                     unsubUsers = db.collection('users').onSnapshot(snap => setUsers(snap.docs.map(d => d.data())));
+                }
+                return () => { unsubPrompts(); unsubResponses(); unsubUsers(); };
             }, [user]);
 
             const handleSignIn = (email, pass) => auth.signInWithEmailAndPassword(email, pass);
@@ -749,67 +711,55 @@
             };
             const handleSignOut = () => auth.signOut();
 
-            const handleCreatePrompt = async (e) => {
-                e.preventDefault();
-                const text = e.target.elements.content.value;
-                if(!text.trim()) return;
+            const handleCreatePrompt = async (content, attachment, assignedTo) => {
                 await db.collection('prompts').add({
-                    type: activeTab, content: text, 
+                    type: activeTab, content, attachmentUrl: attachment || null, assignedTo: assignedTo || null,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: user.uid
                 });
-                e.target.reset();
             };
             const handleDeletePrompt = (id) => db.collection('prompts').doc(id).delete();
-
             const handleSubmitResponse = (pid, text) => {
                 db.collection('responses').add({
-                    promptId: pid, userId: user.uid, userName: user.displayName || 'Agent',
-                    userEmail: user.email, 
+                    promptId: pid, userId: user.uid, userName: user.displayName || 'Agent', userEmail: user.email, 
                     responseContent: text, timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     adminFeedback: null, feedbackTimestamp: null, comments: []
                 });
             };
-
             const handleFeedback = (rid, text, score) => {
                 db.collection('responses').doc(rid).update({
-                    adminFeedback: text, score: score,
-                    feedbackTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    feedbackAuthor: user.email // Track who gave feedback
+                    adminFeedback: text, score: score, feedbackTimestamp: firebase.firestore.FieldValue.serverTimestamp(), feedbackAuthor: user.email
                 });
             };
             const handleDeleteFeedback = (rid) => db.collection('responses').doc(rid).update({ adminFeedback: null, feedbackTimestamp: null, score: 0, feedbackAuthor: null });
-
-            const handleAddComment = (rid, text) => {
-                db.collection('responses').doc(rid).update({
-                    comments: firebase.firestore.FieldValue.arrayUnion({
-                        text: text, author: user.displayName || user.email, email: user.email, timestamp: Date.now()
-                    })
-                });
-            };
-            const handleEditComment = (rid, index, newText) => {
+            const handleAddComment = (rid, text) => db.collection('responses').doc(rid).update({ comments: firebase.firestore.FieldValue.arrayUnion({ text, author: user.displayName, email: user.email, timestamp: Date.now() }) });
+            const handleEditComment = (rid, i, text) => {
                 const r = responses.find(r => r.id === rid); if(!r) return;
-                const updated = [...(r.comments || [])];
-                updated[index] = { ...updated[index], text: newText, edited: true };
+                const updated = [...(r.comments || [])]; updated[i] = { ...updated[i], text };
                 db.collection('responses').doc(rid).update({ comments: updated });
             }
-            const handleDeleteComment = (rid, index) => {
+            const handleDeleteComment = (rid, i) => {
                 const r = responses.find(r => r.id === rid); if(!r) return;
-                const updated = (r.comments || []).filter((_, i) => i !== index);
+                const updated = (r.comments || []).filter((_, idx) => idx !== i);
                 db.collection('responses').doc(rid).update({ comments: updated });
             }
 
             if(loadingAuth) return <div className="min-h-screen flex items-center justify-center text-tempo-blue font-bold animate-pulse bg-zinc-50 dark:bg-zinc-950">Loading...</div>;
             if (!user) return <LoginScreen onSignIn={handleSignIn} onSignUp={handleSignUp} theme={theme} toggleTheme={toggleTheme} />;
 
+            // Filter Prompts based on assignment
             const myResponseIds = responses.filter(r => r.userId === user.uid).map(r => r.promptId);
             const currentPrompts = prompts.filter(p => p.type === activeTab);
-            const activeChallenges = currentPrompts.filter(p => !myResponseIds.includes(p.id));
+            // Only show if unassigned (null) OR user email is in the list
+            const visiblePrompts = userRole === 'admin' ? currentPrompts : currentPrompts.filter(p => !p.assignedTo || p.assignedTo.includes(user.email));
+            
+            const activeChallenges = visiblePrompts.filter(p => !myResponseIds.includes(p.id));
             const myHistory = responses.filter(r => r.userId === user.uid && currentPrompts.find(p => p.id === r.promptId));
-            const getCount = (type) => prompts.filter(p => p.type === type && !myResponseIds.includes(p.id)).length;
+            
+            // Count for badge: only unassigned or assigned to me
+            const getCount = (type) => prompts.filter(p => p.type === type && (!p.assignedTo || p.assignedTo.includes(user.email)) && !myResponseIds.includes(p.id)).length;
 
             return (
                 <div className="pb-20">
-                    <FitnessBackground />
                     <Header theme={theme} toggleTheme={toggleTheme} userRole={userRole} currentUser={user} onSignOut={handleSignOut} />
                     <main className="max-w-4xl mx-auto px-4 py-8 relative z-10">
                         <div className="flex bg-white dark:bg-zinc-900 p-1.5 rounded-2xl mb-10 shadow-sm border border-zinc-100 dark:border-zinc-800">
@@ -827,7 +777,8 @@
                         </div>
                         {userRole === 'admin' ? (
                             <AdminView 
-                                prompts={prompts} responses={responses} handleCreatePrompt={handleCreatePrompt} handleDeletePrompt={handleDeletePrompt} 
+                                prompts={prompts} responses={responses} users={users} 
+                                handleCreatePrompt={handleCreatePrompt} handleDeletePrompt={handleDeletePrompt} 
                                 handleFeedback={handleFeedback} handleDeleteFeedback={handleDeleteFeedback} handleAddComment={handleAddComment} 
                                 onEditComment={handleEditComment} onDeleteComment={handleDeleteComment} activeTab={activeTab} setActiveTab={setActiveTab} currentUser={user}
                             />
